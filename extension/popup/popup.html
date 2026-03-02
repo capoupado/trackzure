@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Trackzure</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="popup-header">
+    <h1>Trackzure</h1>
+
+    <!-- Refresh button -->
+    <button class="btn-icon" id="btn-refresh" title="Refresh work items" aria-label="Refresh">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M13.65 2.35A7.958 7.958 0 0 0 8 0C3.58 0 0 3.58 0 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 8 14c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L9 7h7V0l-2.35 2.35z" fill="currentColor"/>
+      </svg>
+    </button>
+
+    <!-- Filter by iteration -->
+    <button class="btn-icon" id="btn-filter" title="Filter by iteration" aria-label="Filter" aria-expanded="false">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 .53 1.28l-4.78 4.78V13a.75.75 0 0 1-.43.68l-3 1.5A.75.75 0 0 1 5.5 14.5V8.06L.72 3.28A.75.75 0 0 1 1 2.75z" fill="currentColor"/>
+      </svg>
+    </button>
+
+    <!-- Settings link -->
+    <button class="btn-icon" id="btn-settings" title="Open Settings" aria-label="Settings">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M13.95 8.82c.03-.27.05-.54.05-.82s-.02-.55-.05-.82l1.77-1.38a.42.42 0 0 0 .1-.54l-1.68-2.91a.42.42 0 0 0-.51-.18l-2.09.84a6.1 6.1 0 0 0-1.41-.82L9.8.42A.41.41 0 0 0 9.38 0H6.62a.41.41 0 0 0-.41.35L5.88 2.2c-.5.21-.96.49-1.41.82L2.38 2.18a.41.41 0 0 0-.51.18L.19 5.27a.41.41 0 0 0 .1.54l1.77 1.38C2.02 7.45 2 7.72 2 8s.02.55.06.82L.29 10.19a.42.42 0 0 0-.1.54l1.68 2.91c.1.18.32.25.51.18l2.09-.84c.45.33.91.61 1.41.82l.33 1.78c.06.2.24.35.44.35h3.37c.2 0 .38-.14.41-.35l.33-1.78a6.1 6.1 0 0 0 1.41-.82l2.09.84c.19.07.41 0 .51-.18l1.68-2.91a.42.42 0 0 0-.1-.54l-1.8-1.37zM8 10.5A2.5 2.5 0 1 1 8 5.5a2.5 2.5 0 0 1 0 5z" fill="currentColor"/>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Tab navigation -->
+  <nav class="tab-nav" role="tablist" aria-label="Main navigation">
+    <button class="tab-btn tab-btn--active" id="tab-work-items" role="tab"
+            aria-selected="true" aria-controls="panel-work-items" data-tab="work-items">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M2 2h12v1H2V2zm0 3h8v1H2V5zm0 3h10v1H2V8zm0 3h6v1H2v-1z" fill="currentColor"/>
+        <rect x="1" y="1" width="14" height="14" rx="1" stroke="currentColor" stroke-width="1" fill="none"/>
+      </svg>
+      <span>Work Items</span>
+    </button>
+    <button class="tab-btn" id="tab-pull-requests" role="tab"
+            aria-selected="false" aria-controls="panel-pull-requests" data-tab="pull-requests">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="4" cy="3" r="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/>
+        <circle cx="4" cy="13" r="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/>
+        <circle cx="12" cy="5" r="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/>
+        <line x1="4" y1="4.5" x2="4" y2="11.5" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M5.5 5.5 Q8 5.5 8 7 L8 9 Q8 10.5 10.5 10.5" stroke="currentColor" stroke-width="1.2" fill="none"/>
+        <line x1="12" y1="6.5" x2="12" y2="10.5" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      <span>Pull Requests</span>
+    </button>
+  </nav>
+
+  <!-- F3 — Iteration filter panel -->
+  <div id="filter-panel" hidden>
+    <ul id="filter-list" role="listbox" aria-label="Filter by iteration"></ul>
+  </div>
+
+  <!-- Auth warning banner (shown on AUTH_ERROR) -->
+  <div id="auth-banner" role="alert">
+    <span id="auth-banner-msg">Authentication failed — update your token in Settings.</span>
+    <button class="btn-icon" id="auth-banner-settings" style="font-size:12px;color:var(--color-primary);border:none;background:none;cursor:pointer;text-decoration:underline;padding:0;">
+      Open Settings
+    </button>
+  </div>
+
+  <!-- Work Items panel -->
+  <div id="panel-work-items" class="tab-panel" role="tabpanel">
+    <main>
+      <!-- Work item list (populated by JS) -->
+      <ul id="work-item-list" aria-label="Your active work items"></ul>
+
+      <!-- Empty state -->
+      <div id="empty-state" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">🎉</span>
+        <p>No active work items assigned to you — enjoy the calm.</p>
+        <button class="btn-primary" id="btn-empty-refresh">Refresh</button>
+      </div>
+
+      <!-- Error state -->
+      <div id="error-state" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">⚠️</span>
+        <p id="error-msg">Could not load work items.</p>
+        <button class="btn-primary" id="btn-retry">Retry</button>
+      </div>
+
+      <!-- Not configured state -->
+      <div id="setup-state" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">🔧</span>
+        <p>Configure your server connection to get started.</p>
+        <button class="btn-primary" id="btn-setup">Open Settings</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- Pull Requests panel -->
+  <div id="panel-pull-requests" class="tab-panel" role="tabpanel" hidden>
+    <main>
+      <!-- Own PRs section -->
+      <section class="pr-section">
+        <h2 class="pr-section-title">My Pull Requests</h2>
+        <ul id="pr-own-list" class="pr-list" aria-label="Your pull requests"></ul>
+      </section>
+      <!-- Reviewing section -->
+      <section class="pr-section">
+        <h2 class="pr-section-title">Reviewing</h2>
+        <ul id="pr-review-list" class="pr-list" aria-label="Pull requests to review"></ul>
+      </section>
+      <!-- Empty state -->
+      <div id="pr-empty-state" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">✅</span>
+        <p>No active pull requests — inbox zero!</p>
+      </div>
+      <!-- Error state -->
+      <div id="pr-error-state" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">⚠️</span>
+        <p id="pr-error-msg">Could not load pull requests.</p>
+        <button class="btn-primary" id="btn-pr-retry">Retry</button>
+      </div>
+      <!-- Not configured state -->
+      <div id="pr-setup-state" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">🔧</span>
+        <p>Configure your server to see pull requests.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Log Time dialog -->
+  <dialog id="log-time-dialog" aria-labelledby="dialog-title">
+    <div class="dialog-header">
+      <h2 id="dialog-title">Log Time</h2>
+    </div>
+    <div class="dialog-body">
+      <p class="item-title" id="dialog-item-title"></p>
+
+      <div class="field">
+        <label for="dialog-duration">Duration (hours)</label>
+        <input
+          type="text"
+          id="dialog-duration"
+          placeholder="e.g. 1.5 or 90m or 1h 30m"
+          autocomplete="off"
+        />
+      </div>
+
+      <div class="field">
+        <label for="dialog-comment">Comment (optional)</label>
+        <textarea
+          id="dialog-comment"
+          placeholder="Brief description of work done…"
+          rows="3"
+        ></textarea>
+      </div>
+
+      <div class="dialog-error" id="dialog-error"></div>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn-ghost" id="dialog-cancel">Cancel</button>
+      <button class="btn-primary" id="dialog-submit">Submit</button>
+    </div>
+  </dialog>
+
+  <!-- Toast notification -->
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

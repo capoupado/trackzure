@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trackzure — Settings</title>
+  <style>
+    :root {
+      --color-primary: #0078D4;
+      --color-primary-hover: #106EBE;
+      --color-surface: #ffffff;
+      --color-surface-secondary: #f3f2f1;
+      --color-border: #edebe9;
+      --color-text: #201f1e;
+      --color-text-muted: #605e5c;
+      --color-success: #107c10;
+      --color-error: #d83b01;
+      --color-warning: #797673;
+      --radius: 4px;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-surface: #1b1a19;
+        --color-surface-secondary: #252423;
+        --color-border: #3b3a39;
+        --color-text: #f3f2f1;
+        --color-text-muted: #a19f9d;
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--color-surface-secondary);
+      color: var(--color-text);
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    .page {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    header h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--color-primary);
+    }
+
+    header .version {
+      font-size: 12px;
+      color: var(--color-text-muted);
+    }
+
+    fieldset {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    legend {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--color-text-muted);
+      padding: 0 4px;
+    }
+
+    .field {
+      margin-top: 16px;
+    }
+
+    .field:first-of-type {
+      margin-top: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    input[type="text"],
+    input[type="url"],
+    input[type="password"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      background: var(--color-surface);
+      color: var(--color-text);
+      font-family: var(--font);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(0,120,212,0.2);
+    }
+
+    .pat-wrapper {
+      position: relative;
+    }
+
+    .pat-wrapper input {
+      padding-right: 80px;
+    }
+
+    .btn-show-hide {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--color-primary);
+      padding: 2px 4px;
+      font-family: var(--font);
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .checkbox-row label {
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .radio-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .radio-row input[type="radio"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .radio-row label {
+      margin: 0;
+      font-weight: 400;
+      cursor: pointer;
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      margin-top: 4px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .btn-primary {
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 8px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: var(--font);
+      transition: background 0.15s;
+    }
+
+    .btn-primary:hover { background: var(--color-primary-hover); }
+    .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--color-primary);
+      border: 1px solid var(--color-primary);
+      border-radius: var(--radius);
+      padding: 8px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: var(--font);
+      transition: background 0.15s;
+    }
+
+    .btn-ghost:hover { background: rgba(0,120,212,0.08); }
+    .btn-ghost:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--color-error);
+      border: 1px solid var(--color-error);
+      border-radius: var(--radius);
+      padding: 8px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: var(--font);
+    }
+
+    #status-area {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      display: none;
+    }
+
+    #status-area.success {
+      background: #dff6dd;
+      color: var(--color-success);
+      border: 1px solid #9de09d;
+      display: block;
+    }
+
+    #status-area.error {
+      background: #fde7e9;
+      color: var(--color-error);
+      border: 1px solid #f9c8c9;
+      display: block;
+    }
+
+    #status-area.info {
+      background: var(--color-surface-secondary);
+      color: var(--color-text-muted);
+      border: 1px solid var(--color-border);
+      display: block;
+    }
+
+    #connection-result {
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      display: none;
+    }
+
+    #connection-result.success {
+      background: #dff6dd;
+      color: var(--color-success);
+      border: 1px solid #9de09d;
+      display: block;
+    }
+
+    #connection-result.error {
+      background: #fde7e9;
+      color: var(--color-error);
+      border: 1px solid #f9c8c9;
+      display: block;
+    }
+
+    details {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 14px 20px;
+      margin-bottom: 14px;
+    }
+
+    summary {
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-primary);
+      list-style: none;
+    }
+
+    summary::before {
+      content: '▶ ';
+      font-size: 10px;
+    }
+
+    details[open] summary::before {
+      content: '▼ ';
+    }
+
+    details p, details ol, details ul {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+    }
+
+    details ol, details ul {
+      padding-left: 18px;
+    }
+
+    code {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 12px;
+      background: var(--color-surface-secondary);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Trackzure</h1>
+      <span class="version" id="ext-version"></span>
+    </header>
+
+    <!-- Connection settings -->
+    <fieldset>
+      <legend>Connection</legend>
+
+      <div class="field">
+        <label for="provider-select">Provider</label>
+        <select id="provider-select">
+          <option value="azure-devops">Azure DevOps Server (on-premises)</option>
+          <option value="azure-devops-services">Azure DevOps Services (cloud)</option>
+          <option value="jira" disabled>Jira (coming soon)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="server-url">Server URL</label>
+        <input
+          type="url"
+          id="server-url"
+          placeholder="https://tfs.company.com/DefaultCollection"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <p class="help-text">Include the collection name for on-premises (e.g. <code>/DefaultCollection</code>).</p>
+      </div>
+
+      <div class="field">
+        <label for="project-name">Project Name</label>
+        <input
+          type="text"
+          id="project-name"
+          placeholder="MyProject"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <!-- TODO: Replace with fetched dropdown in v1.1 -->
+      </div>
+
+      <div class="field">
+        <label for="pat-input">Personal Access Token (PAT)</label>
+        <div class="pat-wrapper">
+          <input
+            type="password"
+            id="pat-input"
+            placeholder="Paste your PAT here"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button class="btn-show-hide" id="pat-toggle" type="button">Show</button>
+        </div>
+      </div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="remember-token" />
+        <label for="remember-token">Remember token across browser sessions</label>
+      </div>
+
+      <div class="field actions" style="margin-top: 18px;">
+        <button class="btn-ghost" id="btn-test">Test Connection</button>
+      </div>
+
+      <div id="connection-result"></div>
+    </fieldset>
+
+    <!-- Behaviour settings -->
+    <fieldset>
+      <legend>Behavior</legend>
+
+      <div class="field">
+        <label for="refresh-interval">Auto-refresh interval (minutes)</label>
+        <input type="number" id="refresh-interval" min="1" max="60" value="5" style="width: 100px;" />
+      </div>
+
+      <div class="field">
+        <label for="terminal-states">Terminal states to exclude (comma-separated)</label>
+        <input
+          type="text"
+          id="terminal-states"
+          placeholder="Done, Closed, Removed"
+        />
+        <p class="help-text">Work items in these states won't appear in your list.</p>
+      </div>
+
+      <div class="field">
+        <label for="allowed-work-item-types">Show only these work item types (comma-separated)</label>
+        <input
+          type="text"
+          id="allowed-work-item-types"
+          placeholder="Bug, Task, User Story"
+        />
+        <p class="help-text">Leave empty to show all types. Common types: Bug, Task, User Story, Feature, Epic.</p>
+      </div>
+
+      <div class="field">
+        <label>Badge display</label>
+        <div class="radio-group">
+          <div class="radio-row">
+            <input type="radio" name="badge-display" id="badge-elapsed" value="elapsed" />
+            <label for="badge-elapsed">Elapsed time (e.g. 1:23)</label>
+          </div>
+          <div class="radio-row">
+            <input type="radio" name="badge-display" id="badge-itemid" value="itemId" />
+            <label for="badge-itemid">Active work item ID</label>
+          </div>
+          <div class="radio-row">
+            <input type="radio" name="badge-display" id="badge-off" value="off" />
+            <label for="badge-off">Off</label>
+          </div>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn-primary" id="btn-save">Save Settings</button>
+      <button class="btn-danger" id="btn-reset">Reset to Defaults</button>
+    </div>
+
+    <div id="status-area"></div>
+
+    <!-- Help sections -->
+    <div style="margin-top: 28px;">
+      <details>
+        <summary>How to create a Personal Access Token</summary>
+        <ol>
+          <li>Open your Azure DevOps organization in a browser.</li>
+          <li>Click your avatar in the top-right corner → <strong>Personal access tokens</strong>.</li>
+          <li>Click <strong>New Token</strong>.</li>
+          <li>Give it a name (e.g. "Trackzure"), set an expiry, and grant at least <strong>Work Items — Read &amp; write</strong> scope.</li>
+          <li>Copy the token immediately — it won't be shown again.</li>
+        </ol>
+      </details>
+
+      <details>
+        <summary>Self-signed or internal certificate issues</summary>
+        <p>
+          If your Azure DevOps Server uses a self-signed or internal CA certificate, network requests
+          from the extension may fail with a connection error. To resolve this, open your server URL
+          in the browser and accept / trust the certificate there first. The extension uses the same
+          browser trust store, so once trusted in the browser it will work here too.
+        </p>
+      </details>
+
+      <details>
+        <summary>On-premises collection URL format</summary>
+        <p>
+          Azure DevOps Server (TFS) organises projects inside <em>collections</em>.
+          The Server URL must include the collection segment, for example:
+        </p>
+        <p><code>https://tfs.company.com/DefaultCollection</code></p>
+        <p>
+          The <strong>Project Name</strong> field is the short project name that appears
+          after the collection in the URL — e.g. if your work items live at
+          <code>https://tfs.company.com/DefaultCollection/MyProject/_workitems</code>,
+          enter <code>MyProject</code>.
+        </p>
+      </details>
+    </div>
+  </div>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>
