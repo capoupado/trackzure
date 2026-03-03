@@ -548,6 +548,7 @@ export class AzureDevOpsProvider extends WorkItemProvider {
       'System.TeamProject',
       'System.Parent',
       'System.IterationPath',
+      'System.ChangedDate',
     ].join(',');
 
     const rawItems = [];
@@ -593,6 +594,7 @@ export class AzureDevOpsProvider extends WorkItemProvider {
         parentTitle: parentInfo?.title || null,
         parentUrl: parentInfo ? this._buildWorkItemUrl(wi.fields['System.Parent'], parentInfo.teamProject) : null,
         iterationPath: wi.fields['System.IterationPath'] || null,
+        changedDate: wi.fields['System.ChangedDate'] || null,
       };
     });
   }

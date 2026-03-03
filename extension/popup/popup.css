@@ -143,14 +143,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
+  position: relative;
+  padding: 9px 0;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--color-text-muted);
-  font-size: 12px;
-  font-family: var(--font);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
 }
@@ -518,6 +516,34 @@ main::-webkit-scrollbar-thumb:hover {
   color: var(--color-text);
 }
 
+.btn-open {
+  background: rgba(255,255,255,0.05);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--font);
+  transition: background 0.15s, color 0.15s;
+  min-width: 52px;
+  text-align: center;
+}
+
+.btn-open:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.mention-date {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 /* -------------------------------------------------------------------------
    Empty / error states
 ------------------------------------------------------------------------- */
@@ -872,15 +898,15 @@ dialog::backdrop {
    Following tab
 ------------------------------------------------------------------------- */
 
-/* New-comment indicator dot on the tab button */
+/* New-comment indicator dot on the tab button (overlaid top-right of icon) */
 .tab-new-badge {
-  display: inline-block;
+  position: absolute;
+  top: 5px;
+  right: calc(50% - 14px);
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--color-primary);
-  margin-left: 2px;
-  flex-shrink: 0;
 }
 
 /* Input row */

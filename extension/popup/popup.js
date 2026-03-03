@@ -336,6 +336,22 @@ function buildWorkItemRow(item, activeTimer, timeLog) {
   return li;
 }
 
+function formatRelativeDate(iso) {
+  const date = new Date(iso);
+  const now = Date.now();
+  const diffMs = now - date.getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  const diffHr  = Math.floor(diffMs / 3_600_000);
+  const diffDay = Math.floor(diffMs / 86_400_000);
+
+  if (diffMin < 1)  return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr  < 24) return `${diffHr}h ago`;
+  if (diffDay <  7) return `${diffDay}d ago`;
+
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 function getStateBadgeClass(stateStr) {
   const s = (stateStr || '').toLowerCase().replace(/\s+/g, '-');
   if (s === 'in-progress') return 'badge--in-progress';
@@ -777,16 +793,97 @@ function renderMentions(mentions) {
     return;
   }
 
-  // Sort by state priority (same as Work Items tab)
-  const sorted = [...mentions].sort((a, b) => {
-    const diff = getStateOrder(a.state) - getStateOrder(b.state);
-    return diff !== 0 ? diff : a.id.localeCompare(b.id);
-  });
+  // Sort newest first by changedDate
+  const sorted = [...mentions].sort((a, b) =>
+    new Date(b.changedDate || 0) - new Date(a.changedDate || 0)
+  );
 
   for (const item of sorted) {
-    const li = buildWorkItemRow(item, state.activeTimer, state.timeLog);
-    $mentionsList.appendChild(li);
+    $mentionsList.appendChild(buildMentionRow(item));
   }
+}
+
+function buildMentionRow(item) {
+  const li = document.createElement('li');
+  li.className = 'work-item';
+  li.dataset.id = item.id;
+
+  // Info section (same structure as buildWorkItemRow)
+  const infoDiv = document.createElement('div');
+  infoDiv.className = 'work-item-info';
+
+  const titleRow = document.createElement('div');
+  titleRow.className = 'work-item-title-row';
+
+  const idLink = document.createElement('span');
+  idLink.className = 'work-item-id';
+  idLink.textContent = `#${item.id}`;
+  idLink.title = `Open #${item.id} in Azure DevOps`;
+  idLink.addEventListener('click', () => { if (item.url) window.open(item.url, '_blank'); });
+
+  const title = document.createElement('span');
+  title.className = 'work-item-title';
+  title.textContent = item.title;
+  title.title = item.title;
+
+  titleRow.appendChild(idLink);
+  titleRow.appendChild(title);
+
+  const metaRow = document.createElement('div');
+  metaRow.className = 'work-item-meta';
+
+  const badge = document.createElement('span');
+  badge.className = `badge ${getStateBadgeClass(item.state)}`;
+  badge.textContent = item.state;
+
+  const type = document.createElement('span');
+  type.className = 'work-item-type';
+  type.textContent = item.type;
+
+  metaRow.appendChild(badge);
+  metaRow.appendChild(type);
+
+  if (item.changedDate) {
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'mention-date';
+    dateSpan.textContent = formatRelativeDate(item.changedDate);
+    dateSpan.title = new Date(item.changedDate).toLocaleString();
+    metaRow.appendChild(dateSpan);
+  }
+
+  infoDiv.appendChild(titleRow);
+
+  if (item.parentId) {
+    const parentRow = document.createElement('div');
+    parentRow.className = 'work-item-parent';
+    const parentText = item.parentTitle ? `↳ ${item.parentTitle}` : `↳ #${item.parentId}`;
+    parentRow.textContent = parentText;
+    parentRow.title = parentText;
+    if (item.parentUrl) {
+      parentRow.classList.add('work-item-parent--link');
+      parentRow.addEventListener('click', () => window.open(item.parentUrl, '_blank'));
+    }
+    infoDiv.appendChild(parentRow);
+  }
+
+  infoDiv.appendChild(metaRow);
+
+  // Actions — Open button only
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'work-item-actions';
+
+  const openBtn = document.createElement('button');
+  openBtn.className = 'btn-open';
+  openBtn.textContent = 'Open';
+  openBtn.setAttribute('aria-label', `Open #${item.id} in Azure DevOps`);
+  openBtn.addEventListener('click', () => { if (item.url) window.open(item.url, '_blank'); });
+
+  actionsDiv.appendChild(openBtn);
+
+  li.appendChild(infoDiv);
+  li.appendChild(actionsDiv);
+
+  return li;
 }
 
 function updateMentionsTabBadge(mentions) {
