@@ -17,6 +17,8 @@ export const DEFAULT_SETTINGS = {
     prMerged: true,            // own PR merged
     prAbandoned: true,         // own PR abandoned
     prNewComment: true,        // new comment on own PR
+    newMention: true,          // new @mention in a work item
+    followedItemComment: true, // new comment on a followed work item or PR
   },
 };
 

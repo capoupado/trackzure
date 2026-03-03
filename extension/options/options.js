@@ -41,6 +41,8 @@ const $notifyPrAssigned = document.getElementById('notify-pr-assigned');
 const $notifyPrMerged   = document.getElementById('notify-pr-merged');
 const $notifyPrAbandoned = document.getElementById('notify-pr-abandoned');
 const $notifyPrComment  = document.getElementById('notify-pr-comment');
+const $notifyNewMention = document.getElementById('notify-new-mention');
+const $notifyFollowedComment = document.getElementById('notify-followed-comment');
 
 // ---------------------------------------------------------------------------
 // Init
@@ -95,6 +97,8 @@ async function populateForm() {
   $notifyPrMerged.checked   = n.prMerged;
   $notifyPrAbandoned.checked = n.prAbandoned;
   $notifyPrComment.checked  = n.prNewComment;
+  $notifyNewMention.checked = n.newMention;
+  $notifyFollowedComment.checked = n.followedItemComment;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,6 +180,8 @@ function gatherFormValues() {
         prMerged:           $notifyPrMerged.checked,
         prAbandoned:        $notifyPrAbandoned.checked,
         prNewComment:       $notifyPrComment.checked,
+        newMention:         $notifyNewMention.checked,
+        followedItemComment: $notifyFollowedComment.checked,
       },
     },
   };

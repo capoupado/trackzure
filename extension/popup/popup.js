@@ -27,8 +27,8 @@ let _tickInterval = null;
 let _pendingLogWorkItemId = null;
 let _activeIterationFilter = null; // F3
 let _openStateDropdownId = null;   // F1
-// Track how many mentions the user has seen; -1 means popup just opened
-let _lastSeenMentionCount = -1;
+// Timestamp of the newest mention the user has seen (persisted in storage)
+let _mentionsLastViewed = 0;
 
 // ---------------------------------------------------------------------------
 // DOM refs
@@ -122,6 +122,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Start listening for background push messages
   chrome.runtime.onMessage.addListener(handlePushMessage);
+
+  // Load persisted "last viewed mentions" timestamp before first render
+  try {
+    const stored = await chrome.storage.local.get('mentionsLastViewed');
+    _mentionsLastViewed = stored.mentionsLastViewed ?? 0;
+  } catch (_) { /* non-critical */ }
 
   // Load initial state from background
   await refreshState();
@@ -770,8 +776,13 @@ function handleFollowingTabOpened() {
 // ---------------------------------------------------------------------------
 
 function handleMentionsTabOpened() {
-  // Mark current count as seen so the badge clears
-  _lastSeenMentionCount = state.mentions.length;
+  // Persist the newest mention date so the badge stays clear on next popup open
+  const newest = (state.mentions || []).reduce((max, m) => {
+    const t = m.mentionDate ? new Date(m.mentionDate).getTime() : 0;
+    return t > max ? t : max;
+  }, 0);
+  _mentionsLastViewed = newest || Date.now();
+  chrome.storage.local.set({ mentionsLastViewed: _mentionsLastViewed }).catch(() => {});
   updateMentionsTabBadge(state.mentions);
 }
 
@@ -885,9 +896,11 @@ function buildMentionRow(item) {
 }
 
 function updateMentionsTabBadge(mentions) {
-  // Show badge when there are mentions the user hasn't seen in this session
-  const count = (mentions || []).length;
-  const hasUnseen = count > 0 && count !== _lastSeenMentionCount;
+  // Show badge only if there's a mention newer than the last time the user viewed the tab
+  const hasUnseen = (mentions || []).some(m => {
+    const t = m.mentionDate ? new Date(m.mentionDate).getTime() : 0;
+    return t > _mentionsLastViewed;
+  });
   $tabMentionsBadge.hidden = !hasUnseen;
 }
 

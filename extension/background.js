@@ -224,12 +224,22 @@ async function doRefreshFollowedItems() {
   const provider = await initProvider();
   if (!provider) return;
 
-  const currentItems = await getFollowedItems();
+  const [currentItems, settings] = await Promise.all([getFollowedItems(), getSettings()]);
   if (currentItems.length === 0) return;
 
   try {
     const { items, anyNewComments } = await refreshFollowedItems(provider, currentItems);
     await saveFollowedItems(items);
+
+    if (anyNewComments && settings.notifications?.followedItemComment !== false) {
+      for (const item of items) {
+        if (item.hasNewComments) {
+          const label = item.type === 'pullRequest' ? `PR !${item.id}` : `#${item.id}`;
+          sendNotification(`followed-comment-${item.type}-${item.id}`, `New comment on ${label}`, item.title);
+        }
+      }
+    }
+
     pushToPopup({ type: 'FOLLOWED_UPDATED', anyNewComments });
   } catch (err) {
     console.error('[bg] followed items refresh failed:', err.message);
@@ -245,7 +255,22 @@ async function doRefreshMentions(retryCount = 0) {
   if (!provider) return;
 
   try {
-    const items = await fetchMentions(provider);
+    const [{ mentions: oldMentions, mentionsLastFetched }, settings, items] = await Promise.all([
+      getMentions(),
+      getSettings(),
+      fetchMentions(provider),
+    ]);
+
+    // Notify for new mentions (only after the first successful fetch)
+    if (mentionsLastFetched && settings.notifications?.newMention !== false) {
+      const oldIds = new Set((oldMentions || []).map(m => String(m.id)));
+      for (const m of items) {
+        if (!oldIds.has(String(m.id))) {
+          sendNotification(`mention-${m.id}`, `New mention: #${m.id}`, m.title);
+        }
+      }
+    }
+
     await saveMentions(items);
     pushToPopup({ type: 'MENTIONS_UPDATED', count: items.length });
   } catch (err) {
