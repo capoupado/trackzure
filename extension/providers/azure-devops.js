@@ -323,7 +323,10 @@ export class AzureDevOpsProvider extends WorkItemProvider {
             : `${collectionPrefix}/_apis/git/repositories/${repoId}/pullRequests/${prId}/threads?api-version=${prApiVersion}`;
           const result = await this._fetch(threadsUrl);
           const threads = result?.value || [];
-          const threadCount = threads.filter(t => t.isDeleted !== true).length;
+          const threadCount = threads.filter(t =>
+            t.isDeleted !== true &&
+            t.comments?.some(c => c.commentType === 'text')
+          ).length;
           return { ...pr, threadCount };
         } catch {
           return pr; // threadCount remains 0
@@ -425,7 +428,10 @@ export class AzureDevOpsProvider extends WorkItemProvider {
         : `${this.config.baseUrl}/_apis/git/repositories/${fetchedRepoId}/pullRequests/${prId}/threads?api-version=${prApiVersion}`;
       const threadsResult = await this._fetch(threadsUrl);
       const threads = threadsResult?.value || [];
-      mapped.threadCount = threads.filter(t => t.isDeleted !== true).length;
+      mapped.threadCount = threads.filter(t =>
+        t.isDeleted !== true &&
+        t.comments?.some(c => c.commentType === 'text')
+      ).length;
     } catch {
       // threadCount stays 0
     }
