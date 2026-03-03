@@ -187,6 +187,16 @@
       margin-top: 4px;
     }
 
+    .section-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-top: 16px;
+      margin-bottom: 4px;
+    }
+
     .actions {
       display: flex;
       gap: 10px;
@@ -461,10 +471,55 @@
             <label for="badge-itemid">Active work item ID</label>
           </div>
           <div class="radio-row">
+            <input type="radio" name="badge-display" id="badge-pr-required" value="prRequired" />
+            <label for="badge-pr-required">Required PRs without answer</label>
+          </div>
+          <div class="radio-row">
             <input type="radio" name="badge-display" id="badge-off" value="off" />
             <label for="badge-off">Off</label>
           </div>
         </div>
+      </div>
+    </fieldset>
+
+    <!-- Notification settings -->
+    <fieldset>
+      <legend>Notifications</legend>
+
+      <p class="help-text" style="margin-top: 8px; margin-bottom: 4px;">Choose which events trigger browser notifications.</p>
+
+      <p class="section-label">Work Items</p>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="notify-wi-added" />
+        <label for="notify-wi-added">New work item assigned to me</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="notify-wi-removed" />
+        <label for="notify-wi-removed">Work item resolved or removed</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="notify-wi-state" />
+        <label for="notify-wi-state">Work item state changed</label>
+      </div>
+
+      <p class="section-label">Pull Requests</p>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="notify-pr-assigned" />
+        <label for="notify-pr-assigned">New PR review request</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="notify-pr-merged" />
+        <label for="notify-pr-merged">Your PR was merged</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="notify-pr-abandoned" />
+        <label for="notify-pr-abandoned">Your PR was abandoned</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="notify-pr-comment" />
+        <label for="notify-pr-comment">New comment on your PR</label>
       </div>
     </fieldset>
 

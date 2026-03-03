@@ -5,6 +5,8 @@
 import { WorkItemProvider, ProviderError } from './provider.js';
 
 const API_VERSIONS = ['7.0', '6.0-preview', '5.1-preview'];
+// Comment API uses a distinct preview suffix — must stay in sync with API_VERSIONS by index.
+const COMMENT_API_VERSIONS = ['7.0-preview.3', '6.0-preview.3', '5.1-preview.3'];
 
 export class AzureDevOpsProvider extends WorkItemProvider {
   constructor() {
@@ -192,7 +194,8 @@ export class AzureDevOpsProvider extends WorkItemProvider {
     let warning;
     if (comment) {
       try {
-        const commentUrl = `${this.config.baseUrl}/_apis/wit/workitems/${workItemId}/comments?api-version=7.0-preview.3`;
+        const commentApiVersion = COMMENT_API_VERSIONS[this._versionIndex];
+        const commentUrl = `${this.config.baseUrl}/_apis/wit/workitems/${workItemId}/comments?api-version=${commentApiVersion}`;
         await this._fetch(commentUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

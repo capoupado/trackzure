@@ -8,7 +8,16 @@ export const DEFAULT_SETTINGS = {
   terminalStates: ['Done', 'Closed', 'Removed'],
   allowedWorkItemTypes: [], // empty = show all types
   rememberToken: false,
-  badgeDisplay: 'elapsed', // 'elapsed' | 'itemId' | 'off'
+  badgeDisplay: 'elapsed', // 'elapsed' | 'itemId' | 'off' | 'prRequired'
+  notifications: {
+    workItemAdded: true,       // new work item assigned to me
+    workItemRemoved: true,     // work item resolved / removed
+    workItemStateChanged: true, // work item state change
+    prReviewAssigned: true,    // new PR review request
+    prMerged: true,            // own PR merged
+    prAbandoned: true,         // own PR abandoned
+    prNewComment: true,        // new comment on own PR
+  },
 };
 
 // ---------------------------------------------------------------------------

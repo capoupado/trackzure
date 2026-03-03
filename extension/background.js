@@ -130,11 +130,11 @@ async function doRefreshWorkItems(retryCount = 0) {
   if (!provider) return; // not configured yet
 
   try {
-    const { workItems: oldItems } = await getWorkItems();
+    const [{ workItems: oldItems }, settings] = await Promise.all([getWorkItems(), getSettings()]);
     const items = await fetchWorkItems(provider);
 
     if (Array.isArray(oldItems) && oldItems.length > 0) {
-      try { await notifyWorkItemChanges(oldItems, items); } catch { /* non-fatal */ }
+      try { await notifyWorkItemChanges(oldItems, items, settings); } catch { /* non-fatal */ }
     }
 
     await saveWorkItems(items);
@@ -167,13 +167,20 @@ async function doRefreshPRs(retryCount = 0) {
   if (!provider) return;
 
   try {
-    const [prs, oldState] = await Promise.all([
+    const [prs, oldState, settings] = await Promise.all([
       fetchPullRequests(provider),
       getPRNotificationState(),
+      getSettings(),
     ]);
 
-    await notifyPRChanges(oldState, prs.own || [], prs.reviewing || []);
+    await notifyPRChanges(oldState, prs.own || [], prs.reviewing || [], settings);
     await savePullRequests(prs);
+
+    // Update badge immediately if configured to show required PRs
+    if (settings.badgeDisplay === 'prRequired') {
+      const count = (prs.reviewing || []).filter(pr => pr.isRequired && pr.vote === 0).length;
+      setBadge(count > 0 ? String(count) : '', BADGE_COLOR_NORMAL);
+    }
 
     // Build new notification state
     const newState = {
@@ -205,17 +212,21 @@ async function doRefreshPRs(retryCount = 0) {
   }
 }
 
-async function notifyPRChanges(oldState, own, reviewing) {
+async function notifyPRChanges(oldState, own, reviewing, settings) {
+  const n = settings.notifications ?? {};
+
   const seenIds = new Set((oldState.seenReviewPRIds || []).map(String));
   const oldStatuses = oldState.ownPRStatuses || {};
   const oldThreadCounts = oldState.ownPRThreadCounts || {};
 
   // New review assignments
-  for (const pr of reviewing) {
-    const id = String(pr.id);
-    if (!seenIds.has(id)) {
-      const suffix = pr.isRequired ? ' [Required]' : '';
-      sendNotification(`pr-review-${id}`, 'New PR review assigned', `#${id}: ${pr.title}${suffix}`);
+  if (n.prReviewAssigned !== false) {
+    for (const pr of reviewing) {
+      const id = String(pr.id);
+      if (!seenIds.has(id)) {
+        const suffix = pr.isRequired ? ' [Required]' : '';
+        sendNotification(`pr-review-${id}`, 'New PR review assigned', `#${id}: ${pr.title}${suffix}`);
+      }
     }
   }
 
@@ -225,13 +236,13 @@ async function notifyPRChanges(oldState, own, reviewing) {
     const prevStatus = oldStatuses[id];
     const prevThreadCount = oldThreadCounts[id] ?? pr.threadCount;
 
-    if (prevStatus === 'active' && pr.status === 'completed') {
+    if (prevStatus === 'active' && pr.status === 'completed' && n.prMerged !== false) {
       sendNotification(`pr-completed-${id}`, 'Your PR was merged', `#${id}: ${pr.title}`);
-    } else if (prevStatus === 'active' && pr.status === 'abandoned') {
+    } else if (prevStatus === 'active' && pr.status === 'abandoned' && n.prAbandoned !== false) {
       sendNotification(`pr-completed-${id}`, 'Your PR was abandoned', `#${id}: ${pr.title}`);
     }
 
-    if ((pr.threadCount ?? 0) > prevThreadCount) {
+    if ((pr.threadCount ?? 0) > prevThreadCount && n.prNewComment !== false) {
       sendNotification(`pr-comment-${id}`, 'New comment on your PR', `#${id}: ${pr.title}`);
     }
   }
@@ -243,6 +254,14 @@ async function notifyPRChanges(oldState, own, reviewing) {
 
 async function doTimerTick() {
   const [activeTimer, settings] = await Promise.all([getActiveTimer(), getSettings()]);
+
+  if (settings.badgeDisplay === 'prRequired') {
+    const prs = await getPullRequests();
+    const count = (prs.reviewing || []).filter(pr => pr.isRequired && pr.vote === 0).length;
+    setBadge(count > 0 ? String(count) : '', BADGE_COLOR_NORMAL);
+    return;
+  }
+
   if (!activeTimer) {
     clearBadge();
     return;
@@ -398,7 +417,9 @@ async function handleUpdateState({ workItemId, newState }) {
 }
 
 // F5 — Diff old vs new work items and send browser notifications
-async function notifyWorkItemChanges(oldItems, newItems) {
+async function notifyWorkItemChanges(oldItems, newItems, settings) {
+  const n = settings.notifications ?? {};
+
   const oldMap = new Map(oldItems.map(wi => [wi.id, wi]));
   const newMap = new Map(newItems.map(wi => [wi.id, wi]));
 
@@ -406,14 +427,14 @@ async function notifyWorkItemChanges(oldItems, newItems) {
 
   for (const [id, wi] of newMap) {
     if (!oldMap.has(id)) {
-      changes.push({ type: 'added', wi });
+      if (n.workItemAdded !== false) changes.push({ type: 'added', wi });
     } else if (oldMap.get(id).state !== wi.state) {
-      changes.push({ type: 'stateChanged', wi, oldState: oldMap.get(id).state });
+      if (n.workItemStateChanged !== false) changes.push({ type: 'stateChanged', wi, oldState: oldMap.get(id).state });
     }
   }
   for (const [id, wi] of oldMap) {
     if (!newMap.has(id)) {
-      changes.push({ type: 'removed', wi });
+      if (n.workItemRemoved !== false) changes.push({ type: 'removed', wi });
     }
   }
 

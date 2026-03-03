@@ -33,6 +33,15 @@ const $btnReset = document.getElementById('btn-reset');
 const $statusArea = document.getElementById('status-area');
 const $connectionResult = document.getElementById('connection-result');
 
+// Notification checkboxes
+const $notifyWiAdded    = document.getElementById('notify-wi-added');
+const $notifyWiRemoved  = document.getElementById('notify-wi-removed');
+const $notifyWiState    = document.getElementById('notify-wi-state');
+const $notifyPrAssigned = document.getElementById('notify-pr-assigned');
+const $notifyPrMerged   = document.getElementById('notify-pr-merged');
+const $notifyPrAbandoned = document.getElementById('notify-pr-abandoned');
+const $notifyPrComment  = document.getElementById('notify-pr-comment');
+
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
@@ -77,6 +86,15 @@ async function populateForm() {
   const badgeDisplay = settings.badgeDisplay ?? DEFAULT_SETTINGS.badgeDisplay;
   const badgeRadio = document.querySelector(`input[name="badge-display"][value="${badgeDisplay}"]`);
   if (badgeRadio) badgeRadio.checked = true;
+
+  const n = { ...DEFAULT_SETTINGS.notifications, ...(settings.notifications ?? {}) };
+  $notifyWiAdded.checked    = n.workItemAdded;
+  $notifyWiRemoved.checked  = n.workItemRemoved;
+  $notifyWiState.checked    = n.workItemStateChanged;
+  $notifyPrAssigned.checked = n.prReviewAssigned;
+  $notifyPrMerged.checked   = n.prMerged;
+  $notifyPrAbandoned.checked = n.prAbandoned;
+  $notifyPrComment.checked  = n.prNewComment;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,6 +168,15 @@ function gatherFormValues() {
       allowedWorkItemTypes,
       rememberToken: $remember.checked,
       badgeDisplay,
+      notifications: {
+        workItemAdded:      $notifyWiAdded.checked,
+        workItemRemoved:    $notifyWiRemoved.checked,
+        workItemStateChanged: $notifyWiState.checked,
+        prReviewAssigned:   $notifyPrAssigned.checked,
+        prMerged:           $notifyPrMerged.checked,
+        prAbandoned:        $notifyPrAbandoned.checked,
+        prNewComment:       $notifyPrComment.checked,
+      },
     },
   };
 }
