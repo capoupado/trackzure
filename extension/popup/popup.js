@@ -640,9 +640,7 @@ async function handleDialogSubmit() {
   $dialogSubmit.disabled = true;
   $dialogError.className = 'dialog-error';
 
-  const commentText = comment
-    ? `${comment} (logged via Trackzure)`
-    : 'Time logged via Trackzure';
+  const commentText = comment ? `${comment} (logged via Trackzure)` : null;
 
   try {
     const result = await chrome.runtime.sendMessage({
