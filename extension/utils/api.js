@@ -62,6 +62,15 @@ export async function fetchPullRequests(provider) {
 }
 
 /**
+ * Fetch work items where the current user was @mentioned.
+ * @param {WorkItemProvider} provider
+ * @returns {Promise<Array>}
+ */
+export async function fetchMentions(provider) {
+  return provider.getMentions();
+}
+
+/**
  * Resolve a prefixed ID into a followedItem object.
  *   '#NNNNN' → Work Item
  *   '!NNNNN' → Pull Request

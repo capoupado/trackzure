@@ -110,4 +110,13 @@ export class WorkItemProvider {
   async getPullRequestById(prId, repoId) {
     throw new ProviderError(`getPullRequestById not implemented for this provider`, { code: 'NOT_FOUND' });
   }
+
+  /**
+   * Fetch work items where the current user was @mentioned in comments or history.
+   * Providers that do not support this return an empty array by default.
+   * @returns {Promise<Array<{ id: string, title: string, state: string, type: string, url: string }>>}
+   */
+  async getMentions() {
+    return [];
+  }
 }

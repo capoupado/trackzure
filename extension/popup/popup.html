@@ -63,6 +63,16 @@
       <span>Following</span>
       <span class="tab-new-badge" id="tab-following-badge" hidden aria-hidden="true"></span>
     </button>
+    <button class="tab-btn" id="tab-mentions" role="tab"
+            aria-selected="false" aria-controls="panel-mentions" data-tab="mentions">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.2" fill="none"/>
+        <path d="M11 8a3 3 0 1 1-3-3" stroke="currentColor" stroke-width="1.2" fill="none"/>
+        <path d="M11 5v3h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>Mentions</span>
+      <span class="tab-new-badge" id="tab-mentions-badge" hidden aria-hidden="true"></span>
+    </button>
   </nav>
 
   <!-- F3 — Iteration filter panel -->
@@ -160,6 +170,25 @@
       <div id="following-empty-state" class="state-panel" hidden>
         <span class="state-icon" aria-hidden="true">🔖</span>
         <p>Nothing followed yet. Enter an ID above or visit an Azure DevOps page and click "Follow Current Page".</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mentions panel -->
+  <div id="panel-mentions" class="tab-panel" role="tabpanel" hidden>
+    <main>
+      <ul id="mentions-list" aria-label="Work items where you were mentioned"></ul>
+      <div id="mentions-empty-state" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">💬</span>
+        <p>No mentions found — nobody needs you right now.</p>
+      </div>
+      <div id="mentions-error-state" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">⚠️</span>
+        <p id="mentions-error-msg">Could not load mentions.</p>
+      </div>
+      <div id="mentions-setup-state" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">🔧</span>
+        <p>Configure your server connection to see mentions.</p>
       </div>
     </main>
   </div>

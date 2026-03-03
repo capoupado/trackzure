@@ -6,7 +6,7 @@
  * variables surviving across alarm ticks.
  */
 
-import { createProvider, fetchWorkItems, submitTimeLog, fetchPullRequests, resolveFollowedItem, refreshFollowedItems } from './utils/api.js';
+import { createProvider, fetchWorkItems, submitTimeLog, fetchPullRequests, fetchMentions, resolveFollowedItem, refreshFollowedItems } from './utils/api.js';
 import {
   getSettings,
   getActiveTimer,
@@ -22,6 +22,8 @@ import {
   savePRNotificationState,
   getFollowedItems,
   saveFollowedItems,
+  getMentions,
+  saveMentions,
   getProviderConfig,
   getToken,
   getSession,
@@ -234,6 +236,34 @@ async function doRefreshFollowedItems() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Refresh mentions with retry / backoff
+// ---------------------------------------------------------------------------
+
+async function doRefreshMentions(retryCount = 0) {
+  const provider = await initProvider();
+  if (!provider) return;
+
+  try {
+    const items = await fetchMentions(provider);
+    await saveMentions(items);
+    pushToPopup({ type: 'MENTIONS_UPDATED', count: items.length });
+  } catch (err) {
+    console.error('[bg] mentions refresh failed:', err.message);
+
+    if (err.code === 'AUTH_FAILURE') {
+      setBadge('!', BADGE_COLOR_ERROR);
+      pushToPopup({ type: 'AUTH_ERROR', httpStatus: err.httpStatus });
+      return;
+    }
+
+    if (err.retryable && retryCount < RETRY_DELAYS_MS.length) {
+      setTimeout(() => doRefreshMentions(retryCount + 1), RETRY_DELAYS_MS[retryCount]);
+    }
+    // Mentions refresh failure is non-fatal — don't surface error badge
+  }
+}
+
 async function notifyPRChanges(oldState, own, reviewing, settings) {
   const n = settings.notifications ?? {};
 
@@ -306,15 +336,16 @@ async function doTimerTick() {
 // ---------------------------------------------------------------------------
 
 async function handleGetStatus() {
-  const [activeTimer, timeLog, { workItems, workItemsLastFetched }, settings, pullRequests, followedItems] = await Promise.all([
+  const [activeTimer, timeLog, { workItems, workItemsLastFetched }, settings, pullRequests, followedItems, { mentions, mentionsLastFetched }] = await Promise.all([
     getActiveTimer(),
     getTimeLog(),
     getWorkItems(),
     getSettings(),
     getPullRequests(),
     getFollowedItems(),
+    getMentions(),
   ]);
-  return { activeTimer, timeLog, workItems, lastFetched: workItemsLastFetched, settings, pullRequests, followedItems };
+  return { activeTimer, timeLog, workItems, lastFetched: workItemsLastFetched, settings, pullRequests, followedItems, mentions, mentionsLastFetched };
 }
 
 async function handleStartTimer({ workItemId }) {
@@ -362,7 +393,7 @@ async function handleStopTimer() {
 }
 
 async function handleFetchItems() {
-  await Promise.all([doRefreshWorkItems(), doRefreshPRs()]);
+  await Promise.all([doRefreshWorkItems(), doRefreshPRs(), doRefreshMentions()]);
   return { success: true };
 }
 
@@ -553,7 +584,7 @@ chrome.runtime.onStartup.addListener(async () => {
 
 chrome.alarms.onAlarm.addListener(async alarm => {
   if (alarm.name === REFRESH_ALARM) {
-    await Promise.all([doRefreshWorkItems(), doRefreshPRs(), doRefreshFollowedItems()]);
+    await Promise.all([doRefreshWorkItems(), doRefreshPRs(), doRefreshFollowedItems(), doRefreshMentions()]);
   }
   if (alarm.name === TIMER_ALARM) await doTimerTick();
 });

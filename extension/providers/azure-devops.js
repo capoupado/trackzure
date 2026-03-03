@@ -501,6 +501,103 @@ export class AzureDevOpsProvider extends WorkItemProvider {
   }
 
   // ---------------------------------------------------------------------------
+  // getMentions
+  // ---------------------------------------------------------------------------
+
+  async getMentions() {
+    if (!this.user?.displayName) return [];
+
+    const terminalStates = this.getTerminalStates();
+    const stateList = terminalStates.map(s => `'${s}'`).join(', ');
+    // Escape single quotes in display name to avoid WIQL injection
+    const escapedName = this.user.displayName.replace(/'/g, "''");
+    const query = `SELECT [System.Id] FROM WorkItems WHERE [System.History] CONTAINS '${escapedName}' AND [System.State] NOT IN (${stateList}) ORDER BY [System.ChangedDate] DESC`;
+
+    const project = this.config.project;
+    const wiqlBody = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) };
+
+    let wiqlResult;
+    if (project) {
+      const projectUrl = `${this.config.baseUrl}/${encodeURIComponent(project)}/_apis/wit/wiql?api-version=${this.apiVersion}`;
+      try {
+        wiqlResult = await this._fetch(projectUrl, wiqlBody);
+      } catch (err) {
+        if (err.httpStatus !== 404) throw err;
+        const collectionUrl = `${this.config.baseUrl}/_apis/wit/wiql?api-version=${this.apiVersion}`;
+        wiqlResult = await this._fetch(collectionUrl, wiqlBody);
+      }
+    } else {
+      const collectionUrl = `${this.config.baseUrl}/_apis/wit/wiql?api-version=${this.apiVersion}`;
+      wiqlResult = await this._fetch(collectionUrl, wiqlBody);
+    }
+
+    const ids = (wiqlResult?.workItems || []).map(wi => wi.id);
+    if (ids.length === 0) return [];
+
+    // Batch fetch details in chunks of 200
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += 200) {
+      chunks.push(ids.slice(i, i + 200));
+    }
+
+    const fields = [
+      'System.Id',
+      'System.Title',
+      'System.State',
+      'System.WorkItemType',
+      'System.TeamProject',
+      'System.Parent',
+      'System.IterationPath',
+    ].join(',');
+
+    const rawItems = [];
+    for (const chunk of chunks) {
+      const detailUrl = `${this.config.baseUrl}/_apis/wit/workitems?ids=${chunk.join(',')}&fields=${encodeURIComponent(fields)}&api-version=${this.apiVersion}`;
+      const detailResult = await this._fetch(detailUrl);
+      rawItems.push(...(detailResult?.value || []));
+    }
+
+    // Fetch parent titles (non-fatal)
+    const parentTitleMap = {};
+    const parentIds = [...new Set(rawItems.map(wi => wi.fields['System.Parent']).filter(Boolean))];
+    if (parentIds.length > 0) {
+      const parentChunks = [];
+      for (let i = 0; i < parentIds.length; i += 200) {
+        parentChunks.push(parentIds.slice(i, i + 200));
+      }
+      for (const pChunk of parentChunks) {
+        try {
+          const parentFetchUrl = `${this.config.baseUrl}/_apis/wit/workitems?ids=${pChunk.join(',')}&fields=System.Id,System.Title,System.TeamProject&api-version=${this.apiVersion}`;
+          const parentResult = await this._fetch(parentFetchUrl);
+          for (const pw of (parentResult?.value || [])) {
+            parentTitleMap[pw.id] = {
+              title: pw.fields['System.Title'],
+              teamProject: pw.fields['System.TeamProject'],
+            };
+          }
+        } catch {
+          // Non-fatal — parent info is optional
+        }
+      }
+    }
+
+    return rawItems.map(wi => {
+      const parentInfo = wi.fields['System.Parent'] ? parentTitleMap[wi.fields['System.Parent']] : null;
+      return {
+        id: String(wi.id),
+        title: wi.fields['System.Title'] || '(no title)',
+        state: wi.fields['System.State'] || '',
+        type: wi.fields['System.WorkItemType'] || '',
+        url: this._buildWorkItemUrl(wi.id, wi.fields['System.TeamProject']),
+        parentId: wi.fields['System.Parent'] ? String(wi.fields['System.Parent']) : null,
+        parentTitle: parentInfo?.title || null,
+        parentUrl: parentInfo ? this._buildWorkItemUrl(wi.fields['System.Parent'], parentInfo.teamProject) : null,
+        iterationPath: wi.fields['System.IterationPath'] || null,
+      };
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
 

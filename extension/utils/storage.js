@@ -223,3 +223,16 @@ export async function updateFollowedItem(id, updater) {
   const updated = items.map(item => item.id === id ? updater(item) : item);
   await saveFollowedItems(updated);
 }
+
+// ---------------------------------------------------------------------------
+// Mentions
+// ---------------------------------------------------------------------------
+
+export async function getMentions() {
+  const { mentions, mentionsLastFetched } = await getLocal(['mentions', 'mentionsLastFetched']);
+  return { mentions: mentions || [], mentionsLastFetched: mentionsLastFetched || null };
+}
+
+export async function saveMentions(items) {
+  await setLocal({ mentions: items, mentionsLastFetched: Date.now() });
+}

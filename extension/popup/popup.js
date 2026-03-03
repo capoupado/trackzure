@@ -19,12 +19,16 @@ let state = {
   settings: {},
   pullRequests: { own: [], reviewing: [] },
   followedItems: [],
+  mentions: [],
+  mentionsLastFetched: null,
 };
 
 let _tickInterval = null;
 let _pendingLogWorkItemId = null;
 let _activeIterationFilter = null; // F3
 let _openStateDropdownId = null;   // F1
+// Track how many mentions the user has seen; -1 means popup just opened
+let _lastSeenMentionCount = -1;
 
 // ---------------------------------------------------------------------------
 // DOM refs
@@ -66,6 +70,13 @@ const $followedList = document.getElementById('followed-list');
 const $followingEmptyState = document.getElementById('following-empty-state');
 const $followError = document.getElementById('follow-error');
 const $tabFollowingBadge = document.getElementById('tab-following-badge');
+
+// Mentions panel refs
+const $mentionsList = document.getElementById('mentions-list');
+const $mentionsEmptyState = document.getElementById('mentions-empty-state');
+const $mentionsErrorState = document.getElementById('mentions-error-state');
+const $mentionsSetupState = document.getElementById('mentions-setup-state');
+const $tabMentionsBadge = document.getElementById('tab-mentions-badge');
 
 // ---------------------------------------------------------------------------
 // Init
@@ -135,6 +146,8 @@ async function refreshState() {
     renderPRs(state.pullRequests);
     renderFollowedItems(state.followedItems);
     updateFollowingTabBadge(state.followedItems);
+    renderMentions(state.mentions);
+    updateMentionsTabBadge(state.mentions);
 
     // Trigger a fresh fetch if data is stale (> refreshIntervalMin)
     const intervalMs = (state.settings?.refreshIntervalMin ?? 5) * 60_000;
@@ -661,6 +674,15 @@ function handlePushMessage(message) {
         updateFollowingTabBadge(status.followedItems);
       }
     });
+  } else if (message.type === 'MENTIONS_UPDATED') {
+    chrome.runtime.sendMessage({ type: 'GET_STATUS' }, status => {
+      if (status?.mentions) {
+        state.mentions = status.mentions;
+        state.mentionsLastFetched = status.mentionsLastFetched;
+        renderMentions(state.mentions);
+        updateMentionsTabBadge(state.mentions);
+      }
+    });
   } else if (message.type === 'AUTH_ERROR') {
     $authBannerMsg.textContent = `Authentication failed (HTTP ${message.httpStatus || ''}) — update your token in Settings.`;
     $authBanner.classList.add('visible');
@@ -712,6 +734,8 @@ function switchTab(tabId) {
   });
   if (tabId === 'following') {
     handleFollowingTabOpened();
+  } else if (tabId === 'mentions') {
+    handleMentionsTabOpened();
   }
 }
 
@@ -725,6 +749,51 @@ function handleFollowingTabOpened() {
 
   // Persist to background
   chrome.runtime.sendMessage({ type: 'MARK_FOLLOWED_SEEN' }).catch(() => {});
+}
+
+// ---------------------------------------------------------------------------
+// Mentions tab
+// ---------------------------------------------------------------------------
+
+function handleMentionsTabOpened() {
+  // Mark current count as seen so the badge clears
+  _lastSeenMentionCount = state.mentions.length;
+  updateMentionsTabBadge(state.mentions);
+}
+
+function renderMentions(mentions) {
+  $mentionsList.textContent = '';
+  $mentionsEmptyState.hidden = true;
+  $mentionsErrorState.hidden = true;
+  $mentionsSetupState.hidden = true;
+
+  if (mentions === null || mentions === undefined) {
+    $mentionsSetupState.hidden = false;
+    return;
+  }
+
+  if (mentions.length === 0) {
+    $mentionsEmptyState.hidden = false;
+    return;
+  }
+
+  // Sort by state priority (same as Work Items tab)
+  const sorted = [...mentions].sort((a, b) => {
+    const diff = getStateOrder(a.state) - getStateOrder(b.state);
+    return diff !== 0 ? diff : a.id.localeCompare(b.id);
+  });
+
+  for (const item of sorted) {
+    const li = buildWorkItemRow(item, state.activeTimer, state.timeLog);
+    $mentionsList.appendChild(li);
+  }
+}
+
+function updateMentionsTabBadge(mentions) {
+  // Show badge when there are mentions the user hasn't seen in this session
+  const count = (mentions || []).length;
+  const hasUnseen = count > 0 && count !== _lastSeenMentionCount;
+  $tabMentionsBadge.hidden = !hasUnseen;
 }
 
 // ---------------------------------------------------------------------------
