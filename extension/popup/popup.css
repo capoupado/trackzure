@@ -890,22 +890,50 @@ dialog::backdrop {
   padding: 10px 10px 4px;
 }
 
-.follow-input-row input {
+/* Grouped type-select + text input */
+.follow-input-group {
+  display: flex;
   flex: 1;
-  padding: 6px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  overflow: hidden;
   background: rgba(255,255,255,0.07);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.follow-input-group:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(59,143,232,0.2);
+}
+
+.follow-type-select {
+  background: rgba(255,255,255,0.06);
+  border: none;
+  border-right: 1px solid var(--color-border);
+  color: var(--color-primary);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 4px 0 7px;
+  cursor: pointer;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.follow-type-select:hover {
+  background: rgba(255,255,255,0.10);
+}
+
+.follow-id-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
   color: var(--color-text);
   font-family: var(--font);
   font-size: 13px;
+  padding: 6px 10px;
   outline: none;
-  transition: border-color 0.15s;
-}
-
-.follow-input-row input:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(59,143,232,0.2);
 }
 
 .btn-follow-add {

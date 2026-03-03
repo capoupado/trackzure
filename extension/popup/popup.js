@@ -58,6 +58,7 @@ const $prErrorState = document.getElementById('pr-error-state');
 const $prSetupState = document.getElementById('pr-setup-state');
 
 // Following panel refs
+const $followTypeSelect = document.getElementById('follow-type-select');
 const $followInput = document.getElementById('follow-input');
 const $btnFollowAdd = document.getElementById('btn-follow-add');
 const $btnFollowCurrent = document.getElementById('btn-follow-current');
@@ -904,14 +905,17 @@ function getVoteLabel(vote) {
 // ---------------------------------------------------------------------------
 
 async function handleFollowAdd() {
-  const raw = $followInput.value.trim();
-  if (!raw) return;
+  const num = $followInput.value.trim();
+  if (!num) return;
+
+  const prefix = $followTypeSelect.value === 'pr' ? '!' : '#';
+  const rawId = `${prefix}${num}`;
 
   hideFollowError();
   $btnFollowAdd.disabled = true;
 
   try {
-    const result = await chrome.runtime.sendMessage({ type: 'FOLLOW_ITEM', rawId: raw });
+    const result = await chrome.runtime.sendMessage({ type: 'FOLLOW_ITEM', rawId });
     if (result?.success) {
       $followInput.value = '';
       state.followedItems = [...state.followedItems, result.item];
@@ -936,14 +940,18 @@ async function handleFollowCurrentPage() {
 
     const wiMatch = url.match(/\/_workitems\/edit\/(\d+)/);
     const prMatch = url.match(/\/pullrequest\/(\d+)/);
-    const id = wiMatch?.[1] || prMatch?.[1] || null;
 
-    if (!id) {
+    if (wiMatch) {
+      $followTypeSelect.value = 'wi';
+      $followInput.value = wiMatch[1];
+    } else if (prMatch) {
+      $followTypeSelect.value = 'pr';
+      $followInput.value = prMatch[1];
+    } else {
       showFollowError('Current page is not an Azure DevOps work item or pull request.');
       return;
     }
 
-    $followInput.value = `#${id}`;
     await handleFollowAdd();
   } catch (err) {
     showFollowError(`Could not read current tab: ${err.message}`);

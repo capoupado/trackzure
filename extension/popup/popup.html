@@ -143,7 +143,13 @@
   <div id="panel-following" class="tab-panel" role="tabpanel" hidden>
     <main>
       <div class="follow-input-row">
-        <input type="text" id="follow-input" placeholder="#12345" maxlength="20" aria-label="Work item or PR ID to follow" />
+        <div class="follow-input-group">
+          <select id="follow-type-select" class="follow-type-select" aria-label="Item type">
+            <option value="wi"># WI</option>
+            <option value="pr">! PR</option>
+          </select>
+          <input type="text" id="follow-input" class="follow-id-input" placeholder="12345" maxlength="20" aria-label="ID to follow" />
+        </div>
         <button class="btn-primary btn-follow-add" id="btn-follow-add">Follow</button>
       </div>
       <div class="follow-current-row">

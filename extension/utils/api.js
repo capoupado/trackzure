@@ -62,20 +62,29 @@ export async function fetchPullRequests(provider) {
 }
 
 /**
- * Resolve a raw ID (work item or PR) into a followedItem object.
- * Tries work item first; falls back to PR on NOT_FOUND.
+ * Resolve a prefixed ID into a followedItem object.
+ *   '#NNNNN' → Work Item
+ *   '!NNNNN' → Pull Request
+ *
  * @param {WorkItemProvider} provider
- * @param {string} rawId — numeric string, may include leading '#'
+ * @param {string} rawId — must begin with '#' or '!'
  * @returns {Promise<object>} followedItem shape
  */
 export async function resolveFollowedItem(provider, rawId) {
-  const id = String(rawId).replace(/^#/, '').trim();
-  if (!/^\d+$/.test(id)) {
-    throw new ProviderError('Invalid ID — must be numeric', { code: 'NOT_FOUND' });
+  const raw = String(rawId).trim();
+  const wiOnly = raw.startsWith('#');
+  const prOnly = raw.startsWith('!');
+  const id = raw.slice(1);
+
+  if (!wiOnly && !prOnly) {
+    throw new ProviderError('Use # for work items or ! for pull requests', { code: 'NOT_FOUND' });
   }
 
-  // Try work item first
-  try {
+  if (!/^\d+$/.test(id)) {
+    throw new ProviderError('ID must be numeric', { code: 'NOT_FOUND' });
+  }
+
+  if (wiOnly) {
     const wi = await provider.getWorkItemById(id);
     return {
       id: wi.id,
@@ -86,34 +95,26 @@ export async function resolveFollowedItem(provider, rawId) {
       url: wi.url,
       addedAt: Date.now(),
     };
-  } catch (err) {
-    if (err.code !== 'NOT_FOUND') throw err;
   }
 
-  // Fall back to PR
-  try {
-    const pr = await provider.getPullRequestById(id, undefined);
-    return {
-      id: String(pr.id),
-      type: 'pullRequest',
-      title: pr.title,
-      status: pr.status,
-      isDraft: pr.isDraft,
-      repository: pr.repository,
-      repoId: pr.repoId,
-      sourceBranch: pr.sourceBranch,
-      targetBranch: pr.targetBranch,
-      threadCount: pr.threadCount ?? 0,
-      lastSeenThreadCount: pr.threadCount ?? 0,
-      hasNewComments: false,
-      url: pr.url,
-      addedAt: Date.now(),
-    };
-  } catch (err) {
-    if (err.code !== 'NOT_FOUND') throw err;
-  }
-
-  throw new ProviderError(`No work item or PR found with ID #${id}`, { code: 'NOT_FOUND' });
+  // prOnly
+  const pr = await provider.getPullRequestById(id, undefined);
+  return {
+    id: String(pr.id),
+    type: 'pullRequest',
+    title: pr.title,
+    status: pr.status,
+    isDraft: pr.isDraft,
+    repository: pr.repository,
+    repoId: pr.repoId,
+    sourceBranch: pr.sourceBranch,
+    targetBranch: pr.targetBranch,
+    threadCount: pr.threadCount ?? 0,
+    lastSeenThreadCount: pr.threadCount ?? 0,
+    hasNewComments: false,
+    url: pr.url,
+    addedAt: Date.now(),
+  };
 }
 
 /**
