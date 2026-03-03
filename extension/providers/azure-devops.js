@@ -582,6 +582,28 @@ export class AzureDevOpsProvider extends WorkItemProvider {
       }
     }
 
+    // Fetch comments in parallel to find the date of the actual @mention.
+    // Falls back to System.ChangedDate if the comments API is unavailable.
+    const commentApiVersion = COMMENT_API_VERSIONS[this._versionIndex];
+    const mentionDateMap = {};
+    await Promise.all(rawItems.map(async (wi) => {
+      try {
+        const commentsUrl = `${this.config.baseUrl}/_apis/wit/workitems/${wi.id}/comments?api-version=${commentApiVersion}`;
+        const result = await this._fetch(commentsUrl);
+        const comments = result?.comments || [];
+        // Find comments that contain the user's display name, pick the most recent
+        const name = this.user.displayName;
+        const matched = comments
+          .filter(c => c.text && c.text.includes(name))
+          .sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
+        if (matched.length > 0) {
+          mentionDateMap[wi.id] = matched[0].createdDate;
+        }
+      } catch {
+        // Non-fatal — fall back to changedDate
+      }
+    }));
+
     return rawItems.map(wi => {
       const parentInfo = wi.fields['System.Parent'] ? parentTitleMap[wi.fields['System.Parent']] : null;
       return {
@@ -594,7 +616,7 @@ export class AzureDevOpsProvider extends WorkItemProvider {
         parentTitle: parentInfo?.title || null,
         parentUrl: parentInfo ? this._buildWorkItemUrl(wi.fields['System.Parent'], parentInfo.teamProject) : null,
         iterationPath: wi.fields['System.IterationPath'] || null,
-        changedDate: wi.fields['System.ChangedDate'] || null,
+        mentionDate: mentionDateMap[wi.id] || wi.fields['System.ChangedDate'] || null,
       };
     });
   }

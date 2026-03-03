@@ -793,9 +793,9 @@ function renderMentions(mentions) {
     return;
   }
 
-  // Sort newest first by changedDate
+  // Sort newest first by mentionDate
   const sorted = [...mentions].sort((a, b) =>
-    new Date(b.changedDate || 0) - new Date(a.changedDate || 0)
+    new Date(b.mentionDate || 0) - new Date(a.mentionDate || 0)
   );
 
   for (const item of sorted) {
@@ -843,11 +843,11 @@ function buildMentionRow(item) {
   metaRow.appendChild(badge);
   metaRow.appendChild(type);
 
-  if (item.changedDate) {
+  if (item.mentionDate) {
     const dateSpan = document.createElement('span');
     dateSpan.className = 'mention-date';
-    dateSpan.textContent = formatRelativeDate(item.changedDate);
-    dateSpan.title = new Date(item.changedDate).toLocaleString();
+    dateSpan.textContent = formatRelativeDate(item.mentionDate);
+    dateSpan.title = new Date(item.mentionDate).toLocaleString();
     metaRow.appendChild(dateSpan);
   }
 
