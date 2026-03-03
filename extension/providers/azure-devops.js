@@ -176,37 +176,26 @@ export class AzureDevOpsProvider extends WorkItemProvider {
     const currentCompleted = current?.fields?.['Microsoft.VSTS.Scheduling.CompletedWork'] ?? 0;
     const newCompleted = Math.round((currentCompleted + durationHours) * 100) / 100;
 
-    // Step 2: PATCH CompletedWork
+    // Step 2: PATCH CompletedWork + optional comment via System.History in one request.
+    // System.History is supported on all TFS/AzDO versions; no separate comment endpoint needed.
     const patchUrl = `${this.config.baseUrl}/_apis/wit/workitems/${workItemId}?api-version=${this.apiVersion}`;
+    const patchOps = [
+      {
+        op: 'add',
+        path: '/fields/Microsoft.VSTS.Scheduling.CompletedWork',
+        value: newCompleted,
+      },
+    ];
+    if (comment) {
+      patchOps.push({ op: 'add', path: '/fields/System.History', value: comment });
+    }
     await this._fetch(patchUrl, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json-patch+json' },
-      body: JSON.stringify([
-        {
-          op: 'add',
-          path: '/fields/Microsoft.VSTS.Scheduling.CompletedWork',
-          value: newCompleted,
-        },
-      ]),
+      body: JSON.stringify(patchOps),
     });
 
-    // Step 3: Optionally post a comment (non-fatal)
-    let warning;
-    if (comment) {
-      try {
-        const commentApiVersion = COMMENT_API_VERSIONS[this._versionIndex];
-        const commentUrl = `${this.config.baseUrl}/_apis/wit/workitems/${workItemId}/comments?api-version=${commentApiVersion}`;
-        await this._fetch(commentUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: comment }),
-        });
-      } catch (err) {
-        warning = `Time logged successfully, but adding the comment failed: ${err.message}`;
-      }
-    }
-
-    return { success: true, warning };
+    return { success: true };
   }
 
   // ---------------------------------------------------------------------------
@@ -582,25 +571,45 @@ export class AzureDevOpsProvider extends WorkItemProvider {
       }
     }
 
-    // Fetch comments in parallel to find the date of the actual @mention.
-    // Falls back to System.ChangedDate if the comments API is unavailable.
+    // Fetch the revision history for each work item in parallel to find the exact
+    // date of the comment that mentioned the user.
+    // Strategy: try the Comments API first (AzDO Services / Server 2019+); if it
+    // returns a 404 fall back to the Revisions API which works on all TFS versions.
+    // Each revision carries System.History (the comment text) + System.ChangedDate.
     const commentApiVersion = COMMENT_API_VERSIONS[this._versionIndex];
     const mentionDateMap = {};
+    const name = this.user.displayName;
+
     await Promise.all(rawItems.map(async (wi) => {
+      // --- Attempt 1: Comments API ---
       try {
         const commentsUrl = `${this.config.baseUrl}/_apis/wit/workitems/${wi.id}/comments?api-version=${commentApiVersion}`;
         const result = await this._fetch(commentsUrl);
         const comments = result?.comments || [];
-        // Find comments that contain the user's display name, pick the most recent
-        const name = this.user.displayName;
         const matched = comments
           .filter(c => c.text && c.text.includes(name))
           .sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
         if (matched.length > 0) {
           mentionDateMap[wi.id] = matched[0].createdDate;
+          return; // found — skip revisions
         }
       } catch {
-        // Non-fatal — fall back to changedDate
+        // Comments API not available on this server — fall through to revisions
+      }
+
+      // --- Attempt 2: Revisions API (all TFS/AzDO versions) ---
+      try {
+        const revisionsUrl = `${this.config.baseUrl}/_apis/wit/workitems/${wi.id}/revisions?api-version=${this.apiVersion}`;
+        const result = await this._fetch(revisionsUrl);
+        const revisions = result?.value || [];
+        const matched = revisions
+          .filter(r => r.fields?.['System.History'] && r.fields['System.History'].includes(name))
+          .sort((a, b) => new Date(b.fields['System.ChangedDate']) - new Date(a.fields['System.ChangedDate']));
+        if (matched.length > 0) {
+          mentionDateMap[wi.id] = matched[0].fields['System.ChangedDate'];
+        }
+      } catch {
+        // Non-fatal — will fall back to work item System.ChangedDate
       }
     }));
 
