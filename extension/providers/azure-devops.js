@@ -341,7 +341,6 @@ export class AzureDevOpsProvider extends WorkItemProvider {
 
   _mapOwnPR(pr) {
     const repo = pr.repository || {};
-    const webUrl = repo.webUrl || this.config.baseUrl;
     return {
       id: pr.pullRequestId,
       title: pr.title || '(no title)',
@@ -351,7 +350,7 @@ export class AzureDevOpsProvider extends WorkItemProvider {
       repoId: repo.id || '',
       sourceBranch: (pr.sourceRefName || '').replace('refs/heads/', ''),
       targetBranch: (pr.targetRefName || '').replace('refs/heads/', ''),
-      url: `${webUrl}/pullrequest/${pr.pullRequestId}`,
+      url: this._buildPRUrl(repo, pr.pullRequestId),
       createdDate: pr.creationDate || null,
       reviewerCount: Array.isArray(pr.reviewers) ? pr.reviewers.length : 0,
       approvedCount: Array.isArray(pr.reviewers) ? pr.reviewers.filter(r => r.vote === 10).length : 0,
@@ -361,7 +360,6 @@ export class AzureDevOpsProvider extends WorkItemProvider {
 
   _mapReviewPR(pr, userId) {
     const repo = pr.repository || {};
-    const webUrl = repo.webUrl || this.config.baseUrl;
     const reviewer = Array.isArray(pr.reviewers)
       ? pr.reviewers.find(r => r.id === userId)
       : null;
@@ -374,12 +372,32 @@ export class AzureDevOpsProvider extends WorkItemProvider {
       repoId: repo.id || '',
       sourceBranch: (pr.sourceRefName || '').replace('refs/heads/', ''),
       targetBranch: (pr.targetRefName || '').replace('refs/heads/', ''),
-      url: `${webUrl}/pullrequest/${pr.pullRequestId}`,
+      url: this._buildPRUrl(repo, pr.pullRequestId),
       createdDate: pr.creationDate || null,
       createdBy: pr.createdBy?.displayName || '',
       isRequired: reviewer?.isRequired ?? false,
       vote: reviewer?.vote ?? 0,
     };
+  }
+
+  /**
+   * Build the web URL to open a PR in the browser.
+   * Prefers repo.webUrl when it is a genuine web URL (not an /_apis/ endpoint).
+   * Falls back to constructing from known parts: {baseUrl}/{project}/_git/{repo}/pullrequest/{id}
+   */
+  _buildPRUrl(repo, prId) {
+    const webUrl = repo.webUrl;
+    if (webUrl && !webUrl.includes('/_apis/')) {
+      return `${webUrl}/pullrequest/${prId}`;
+    }
+    // webUrl absent or points to an API endpoint — build from parts
+    const project = repo.project?.name || this.config.project;
+    const repoName = repo.name;
+    if (project && repoName) {
+      return `${this.config.baseUrl}/${encodeURIComponent(project)}/_git/${encodeURIComponent(repoName)}/pullrequest/${prId}`;
+    }
+    // Last resort: no repo name available
+    return `${this.config.baseUrl}/pullrequest/${prId}`;
   }
 
   // ---------------------------------------------------------------------------
