@@ -6,7 +6,7 @@
  * variables surviving across alarm ticks.
  */
 
-import { createProvider, fetchWorkItems, submitTimeLog, fetchPullRequests } from './utils/api.js';
+import { createProvider, fetchWorkItems, submitTimeLog, fetchPullRequests, resolveFollowedItem, refreshFollowedItems } from './utils/api.js';
 import {
   getSettings,
   getActiveTimer,
@@ -20,6 +20,8 @@ import {
   savePullRequests,
   getPRNotificationState,
   savePRNotificationState,
+  getFollowedItems,
+  saveFollowedItems,
   getProviderConfig,
   getToken,
   getSession,
@@ -212,6 +214,26 @@ async function doRefreshPRs(retryCount = 0) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Refresh followed items
+// ---------------------------------------------------------------------------
+
+async function doRefreshFollowedItems() {
+  const provider = await initProvider();
+  if (!provider) return;
+
+  const currentItems = await getFollowedItems();
+  if (currentItems.length === 0) return;
+
+  try {
+    const { items, anyNewComments } = await refreshFollowedItems(provider, currentItems);
+    await saveFollowedItems(items);
+    pushToPopup({ type: 'FOLLOWED_UPDATED', anyNewComments });
+  } catch (err) {
+    console.error('[bg] followed items refresh failed:', err.message);
+  }
+}
+
 async function notifyPRChanges(oldState, own, reviewing, settings) {
   const n = settings.notifications ?? {};
 
@@ -284,14 +306,15 @@ async function doTimerTick() {
 // ---------------------------------------------------------------------------
 
 async function handleGetStatus() {
-  const [activeTimer, timeLog, { workItems, workItemsLastFetched }, settings, pullRequests] = await Promise.all([
+  const [activeTimer, timeLog, { workItems, workItemsLastFetched }, settings, pullRequests, followedItems] = await Promise.all([
     getActiveTimer(),
     getTimeLog(),
     getWorkItems(),
     getSettings(),
     getPullRequests(),
+    getFollowedItems(),
   ]);
-  return { activeTimer, timeLog, workItems, lastFetched: workItemsLastFetched, settings, pullRequests };
+  return { activeTimer, timeLog, workItems, lastFetched: workItemsLastFetched, settings, pullRequests, followedItems };
 }
 
 async function handleStartTimer({ workItemId }) {
@@ -365,6 +388,50 @@ async function handleLogTime({ workItemId, durationHours, comment }) {
   }
 
   return result;
+}
+
+async function handleFollowItem({ rawId }) {
+  const provider = await initProvider();
+  if (!provider) return { success: false, error: 'Provider not configured. Please check Settings.' };
+
+  try {
+    const item = await resolveFollowedItem(provider, rawId);
+
+    const existing = await getFollowedItems();
+    if (existing.some(i => i.id === item.id && i.type === item.type)) {
+      return { success: false, error: `#${item.id} is already being followed.` };
+    }
+
+    await saveFollowedItems([...existing, item]);
+    return { success: true, item };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+async function handleUnfollowItem({ id, itemType }) {
+  try {
+    const existing = await getFollowedItems();
+    const filtered = existing.filter(i => !(i.id === id && i.type === itemType));
+    await saveFollowedItems(filtered);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+async function handleMarkFollowedSeen() {
+  try {
+    const items = await getFollowedItems();
+    const updated = items.map(item => {
+      if (item.type !== 'pullRequest') return item;
+      return { ...item, lastSeenThreadCount: item.threadCount ?? 0, hasNewComments: false };
+    });
+    await saveFollowedItems(updated);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 }
 
 async function handleSettingsChanged() {
@@ -486,7 +553,7 @@ chrome.runtime.onStartup.addListener(async () => {
 
 chrome.alarms.onAlarm.addListener(async alarm => {
   if (alarm.name === REFRESH_ALARM) {
-    await Promise.all([doRefreshWorkItems(), doRefreshPRs()]);
+    await Promise.all([doRefreshWorkItems(), doRefreshPRs(), doRefreshFollowedItems()]);
   }
   if (alarm.name === TIMER_ALARM) await doTimerTick();
 });
@@ -518,6 +585,12 @@ async function handleMessage(message) {
       return handleGetStateOptions(message);
     case 'UPDATE_STATE':
       return handleUpdateState(message);
+    case 'FOLLOW_ITEM':
+      return handleFollowItem(message);
+    case 'UNFOLLOW_ITEM':
+      return handleUnfollowItem(message);
+    case 'MARK_FOLLOWED_SEEN':
+      return handleMarkFollowedSeen();
     default:
       return { success: false, error: `Unknown message type: ${message.type}` };
   }

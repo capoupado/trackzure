@@ -91,4 +91,23 @@ export class WorkItemProvider {
   async getMyPullRequests() {
     throw new Error('WorkItemProvider.getMyPullRequests() must be implemented');
   }
+
+  /**
+   * Fetch a single work item by ID.
+   * @param {string} workItemId
+   * @returns {Promise<{ id: string, title: string, state: string, type: string, url: string }>}
+   */
+  async getWorkItemById(workItemId) {
+    throw new ProviderError(`getWorkItemById not implemented for this provider`, { code: 'NOT_FOUND' });
+  }
+
+  /**
+   * Fetch a single pull request by ID.
+   * @param {string} prId
+   * @param {string} [repoId] — optional, speeds up lookup when cached
+   * @returns {Promise<object>}
+   */
+  async getPullRequestById(prId, repoId) {
+    throw new ProviderError(`getPullRequestById not implemented for this provider`, { code: 'NOT_FOUND' });
+  }
 }

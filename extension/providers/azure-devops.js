@@ -342,6 +342,97 @@ export class AzureDevOpsProvider extends WorkItemProvider {
     return { own: ownFull, reviewing };
   }
 
+  // ---------------------------------------------------------------------------
+  // getWorkItemById
+  // ---------------------------------------------------------------------------
+
+  async getWorkItemById(id) {
+    const fields = 'System.Id,System.Title,System.State,System.WorkItemType,System.TeamProject';
+    const url = `${this.config.baseUrl}/_apis/wit/workitems/${id}?fields=${encodeURIComponent(fields)}&api-version=${this.apiVersion}`;
+    let data;
+    try {
+      data = await this._fetch(url);
+    } catch (err) {
+      if (err.httpStatus === 404) {
+        throw new ProviderError(`Work item #${id} not found`, { code: 'NOT_FOUND', httpStatus: 404 });
+      }
+      throw err;
+    }
+    if (!data) throw new ProviderError(`Work item #${id} not found`, { code: 'NOT_FOUND' });
+    return {
+      id: String(data.id),
+      title: data.fields?.['System.Title'] || '(no title)',
+      state: data.fields?.['System.State'] || '',
+      type: data.fields?.['System.WorkItemType'] || '',
+      url: this._buildWorkItemUrl(data.id, data.fields?.['System.TeamProject']),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // getPullRequestById
+  // ---------------------------------------------------------------------------
+
+  async getPullRequestById(prId, repoId) {
+    const prApiVersion = '7.0';
+    const project = this.config.project;
+    const basePrefix = project
+      ? `${this.config.baseUrl}/${encodeURIComponent(project)}`
+      : this.config.baseUrl;
+
+    let prData;
+    if (repoId) {
+      // Fast path: we know the repo
+      const url = `${basePrefix}/_apis/git/repositories/${repoId}/pullRequests/${prId}?api-version=${prApiVersion}`;
+      try {
+        prData = await this._fetch(url);
+      } catch (err) {
+        if (err.httpStatus === 404) {
+          throw new ProviderError(`PR #${prId} not found`, { code: 'NOT_FOUND', httpStatus: 404 });
+        }
+        throw err;
+      }
+    } else {
+      // Project-level search — no repo needed
+      const qs = new URLSearchParams({
+        'searchCriteria.pullRequestId': String(prId),
+        '$top': '1',
+        'api-version': prApiVersion,
+      }).toString();
+
+      let result;
+      if (project) {
+        try {
+          result = await this._fetch(`${basePrefix}/_apis/git/pullrequests?${qs}`);
+        } catch (err) {
+          if (err.httpStatus !== 404) throw err;
+          result = await this._fetch(`${this.config.baseUrl}/_apis/git/pullrequests?${qs}`);
+        }
+      } else {
+        result = await this._fetch(`${this.config.baseUrl}/_apis/git/pullrequests?${qs}`);
+      }
+
+      prData = (result?.value || [])[0] || null;
+      if (!prData) throw new ProviderError(`PR #${prId} not found`, { code: 'NOT_FOUND' });
+    }
+
+    const mapped = this._mapOwnPR(prData);
+
+    // Fetch thread count (non-fatal)
+    try {
+      const fetchedRepoId = mapped.repoId;
+      const threadsUrl = project
+        ? `${basePrefix}/_apis/git/repositories/${fetchedRepoId}/pullRequests/${prId}/threads?api-version=${prApiVersion}`
+        : `${this.config.baseUrl}/_apis/git/repositories/${fetchedRepoId}/pullRequests/${prId}/threads?api-version=${prApiVersion}`;
+      const threadsResult = await this._fetch(threadsUrl);
+      const threads = threadsResult?.value || [];
+      mapped.threadCount = threads.filter(t => t.isDeleted !== true).length;
+    } catch {
+      // threadCount stays 0
+    }
+
+    return mapped;
+  }
+
   _mapOwnPR(pr) {
     const repo = pr.repository || {};
     return {

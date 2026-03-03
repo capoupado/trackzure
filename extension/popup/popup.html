@@ -55,6 +55,14 @@
       </svg>
       <span>Pull Requests</span>
     </button>
+    <button class="tab-btn" id="tab-following" role="tab"
+            aria-selected="false" aria-controls="panel-following" data-tab="following">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M3 1h10a1 1 0 0 1 1 1v12.5l-5-2.5-5 2.5V2a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+      </svg>
+      <span>Following</span>
+      <span class="tab-new-badge" id="tab-following-badge" hidden aria-hidden="true"></span>
+    </button>
   </nav>
 
   <!-- F3 — Iteration filter panel -->
@@ -127,6 +135,25 @@
       <div id="pr-setup-state" class="state-panel" hidden>
         <span class="state-icon" aria-hidden="true">🔧</span>
         <p>Configure your server to see pull requests.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Following panel -->
+  <div id="panel-following" class="tab-panel" role="tabpanel" hidden>
+    <main>
+      <div class="follow-input-row">
+        <input type="text" id="follow-input" placeholder="#12345" maxlength="20" aria-label="Work item or PR ID to follow" />
+        <button class="btn-primary btn-follow-add" id="btn-follow-add">Follow</button>
+      </div>
+      <div class="follow-current-row">
+        <button class="btn-ghost btn-follow-current" id="btn-follow-current">Follow Current Page</button>
+      </div>
+      <div id="follow-error" class="follow-error" hidden></div>
+      <ul id="followed-list" aria-label="Followed items"></ul>
+      <div id="following-empty-state" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">🔖</span>
+        <p>Nothing followed yet. Enter an ID above or visit an Azure DevOps page and click "Follow Current Page".</p>
       </div>
     </main>
   </div>

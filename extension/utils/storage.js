@@ -204,3 +204,22 @@ export async function getPRNotificationState() {
 export async function savePRNotificationState(state) {
   await setLocal({ prNotificationState: state });
 }
+
+// ---------------------------------------------------------------------------
+// Followed items
+// ---------------------------------------------------------------------------
+
+export async function getFollowedItems() {
+  const { followedItems } = await getLocal('followedItems');
+  return followedItems || [];
+}
+
+export async function saveFollowedItems(items) {
+  await setLocal({ followedItems: items });
+}
+
+export async function updateFollowedItem(id, updater) {
+  const items = await getFollowedItems();
+  const updated = items.map(item => item.id === id ? updater(item) : item);
+  await saveFollowedItems(updated);
+}

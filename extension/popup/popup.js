@@ -18,6 +18,7 @@ let state = {
   lastFetched: null,
   settings: {},
   pullRequests: { own: [], reviewing: [] },
+  followedItems: [],
 };
 
 let _tickInterval = null;
@@ -56,6 +57,15 @@ const $prEmptyState = document.getElementById('pr-empty-state');
 const $prErrorState = document.getElementById('pr-error-state');
 const $prSetupState = document.getElementById('pr-setup-state');
 
+// Following panel refs
+const $followInput = document.getElementById('follow-input');
+const $btnFollowAdd = document.getElementById('btn-follow-add');
+const $btnFollowCurrent = document.getElementById('btn-follow-current');
+const $followedList = document.getElementById('followed-list');
+const $followingEmptyState = document.getElementById('following-empty-state');
+const $followError = document.getElementById('follow-error');
+const $tabFollowingBadge = document.getElementById('tab-following-badge');
+
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
@@ -74,6 +84,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-pr-retry')?.addEventListener('click', triggerRefresh);
   $dialogCancel.addEventListener('click', closeDialog);
   $dialogSubmit.addEventListener('click', handleDialogSubmit);
+
+  // Following tab controls
+  $btnFollowAdd.addEventListener('click', handleFollowAdd);
+  $followInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleFollowAdd(); });
+  $btnFollowCurrent.addEventListener('click', handleFollowCurrentPage);
 
   // F3 — Filter panel
   $filterBtn.addEventListener('click', (e) => {
@@ -117,6 +132,8 @@ async function refreshState() {
     state = { ...state, ...status };
     render();
     renderPRs(state.pullRequests);
+    renderFollowedItems(state.followedItems);
+    updateFollowingTabBadge(state.followedItems);
 
     // Trigger a fresh fetch if data is stale (> refreshIntervalMin)
     const intervalMs = (state.settings?.refreshIntervalMin ?? 5) * 60_000;
@@ -635,6 +652,14 @@ function handlePushMessage(message) {
         renderPRs(status.pullRequests);
       }
     });
+  } else if (message.type === 'FOLLOWED_UPDATED') {
+    chrome.runtime.sendMessage({ type: 'GET_STATUS' }, status => {
+      if (status?.followedItems) {
+        state.followedItems = status.followedItems;
+        renderFollowedItems(status.followedItems);
+        updateFollowingTabBadge(status.followedItems);
+      }
+    });
   } else if (message.type === 'AUTH_ERROR') {
     $authBannerMsg.textContent = `Authentication failed (HTTP ${message.httpStatus || ''}) — update your token in Settings.`;
     $authBanner.classList.add('visible');
@@ -684,6 +709,21 @@ function switchTab(tabId) {
   document.querySelectorAll('.tab-panel').forEach(p => {
     p.hidden = p.id !== `panel-${tabId}`;
   });
+  if (tabId === 'following') {
+    handleFollowingTabOpened();
+  }
+}
+
+function handleFollowingTabOpened() {
+  // Optimistically clear new-comment flags in local state
+  state.followedItems = state.followedItems.map(item =>
+    item.type === 'pullRequest' ? { ...item, hasNewComments: false } : item
+  );
+  updateFollowingTabBadge(state.followedItems);
+  renderFollowedItems(state.followedItems);
+
+  // Persist to background
+  chrome.runtime.sendMessage({ type: 'MARK_FOLLOWED_SEEN' }).catch(() => {});
 }
 
 // ---------------------------------------------------------------------------
@@ -857,6 +897,220 @@ function getVoteLabel(vote) {
   if (vote === -10) return '✗ Rejected';
   if (vote === 5) return '~ Suggestions';
   return '○ No vote';
+}
+
+// ---------------------------------------------------------------------------
+// Following tab
+// ---------------------------------------------------------------------------
+
+async function handleFollowAdd() {
+  const raw = $followInput.value.trim();
+  if (!raw) return;
+
+  hideFollowError();
+  $btnFollowAdd.disabled = true;
+
+  try {
+    const result = await chrome.runtime.sendMessage({ type: 'FOLLOW_ITEM', rawId: raw });
+    if (result?.success) {
+      $followInput.value = '';
+      state.followedItems = [...state.followedItems, result.item];
+      renderFollowedItems(state.followedItems);
+      showToast(`Following #${result.item.id}`);
+    } else {
+      showFollowError(result?.error || 'Could not follow that item.');
+    }
+  } catch (err) {
+    showFollowError(`Error: ${err.message}`);
+  } finally {
+    $btnFollowAdd.disabled = false;
+  }
+}
+
+async function handleFollowCurrentPage() {
+  hideFollowError();
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = tab?.url || '';
+
+    const wiMatch = url.match(/\/_workitems\/edit\/(\d+)/);
+    const prMatch = url.match(/\/pullrequest\/(\d+)/);
+    const id = wiMatch?.[1] || prMatch?.[1] || null;
+
+    if (!id) {
+      showFollowError('Current page is not an Azure DevOps work item or pull request.');
+      return;
+    }
+
+    $followInput.value = `#${id}`;
+    await handleFollowAdd();
+  } catch (err) {
+    showFollowError(`Could not read current tab: ${err.message}`);
+  }
+}
+
+async function handleUnfollow(item) {
+  try {
+    const result = await chrome.runtime.sendMessage({
+      type: 'UNFOLLOW_ITEM',
+      id: item.id,
+      itemType: item.type,
+    });
+    if (result?.success) {
+      state.followedItems = state.followedItems.filter(i => !(i.id === item.id && i.type === item.type));
+      renderFollowedItems(state.followedItems);
+      updateFollowingTabBadge(state.followedItems);
+      showToast(`Unfollowed #${item.id}`);
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  }
+}
+
+function renderFollowedItems(items) {
+  $followedList.textContent = '';
+
+  if (!items || items.length === 0) {
+    $followingEmptyState.hidden = false;
+    return;
+  }
+
+  $followingEmptyState.hidden = true;
+
+  // Sort: new-comments first, then addedAt desc
+  const sorted = [...items].sort((a, b) => {
+    const aNew = a.hasNewComments ? 1 : 0;
+    const bNew = b.hasNewComments ? 1 : 0;
+    if (bNew !== aNew) return bNew - aNew;
+    return (b.addedAt || 0) - (a.addedAt || 0);
+  });
+
+  for (const item of sorted) {
+    $followedList.appendChild(buildFollowedItemRow(item));
+  }
+}
+
+function buildFollowedItemRow(item) {
+  const li = document.createElement('li');
+  li.className = `followed-item${item.hasNewComments ? ' followed-item--new-comments' : ''}`;
+
+  const infoDiv = document.createElement('div');
+  infoDiv.className = 'followed-item-info';
+
+  // Title row
+  const titleRow = document.createElement('div');
+  titleRow.className = 'followed-item-title-row';
+
+  const idLink = document.createElement('span');
+  idLink.className = 'work-item-id';
+  idLink.textContent = `#${item.id}`;
+  idLink.title = `Open #${item.id}`;
+  idLink.addEventListener('click', () => { if (item.url) window.open(item.url, '_blank'); });
+
+  const typeTag = document.createElement('span');
+  typeTag.className = `followed-type-tag followed-type-tag--${item.type === 'workItem' ? 'wi' : 'pr'}`;
+  typeTag.textContent = item.type === 'workItem' ? 'WI' : 'PR';
+
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'work-item-title';
+  titleSpan.textContent = item.title;
+  titleSpan.title = item.title;
+
+  titleRow.appendChild(idLink);
+  titleRow.appendChild(typeTag);
+  titleRow.appendChild(titleSpan);
+
+  // Meta row
+  const metaRow = document.createElement('div');
+  metaRow.className = 'followed-item-meta';
+
+  if (item.type === 'workItem') {
+    const stateBadge = document.createElement('span');
+    stateBadge.className = `badge ${getStateBadgeClass(item.state)}`;
+    stateBadge.textContent = item.state;
+    metaRow.appendChild(stateBadge);
+
+    if (item.workItemType) {
+      const wiType = document.createElement('span');
+      wiType.className = 'work-item-type';
+      wiType.textContent = item.workItemType;
+      metaRow.appendChild(wiType);
+    }
+  } else {
+    // PR
+    const statusBadge = document.createElement('span');
+    statusBadge.className = `badge ${getPRStatusBadgeClass(item.status)}`;
+    statusBadge.textContent = item.status || 'active';
+    metaRow.appendChild(statusBadge);
+
+    if (item.isDraft) {
+      const draft = document.createElement('span');
+      draft.className = 'pr-draft-tag';
+      draft.textContent = 'Draft';
+      metaRow.appendChild(draft);
+    }
+
+    if (item.repository) {
+      const repo = document.createElement('span');
+      repo.className = 'followed-thread-count';
+      repo.textContent = item.repository;
+      metaRow.appendChild(repo);
+    }
+
+    const threads = document.createElement('span');
+    threads.className = 'followed-thread-count';
+    threads.textContent = `${item.threadCount ?? 0} comment${(item.threadCount ?? 0) === 1 ? '' : 's'}`;
+    metaRow.appendChild(threads);
+
+    if (item.hasNewComments) {
+      const newBadge = document.createElement('span');
+      newBadge.className = 'new-comment-badge';
+      newBadge.textContent = 'New';
+      metaRow.appendChild(newBadge);
+    }
+  }
+
+  infoDiv.appendChild(titleRow);
+  infoDiv.appendChild(metaRow);
+
+  // Actions
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'followed-item-actions';
+
+  const unfollowBtn = document.createElement('button');
+  unfollowBtn.className = 'btn-unfollow';
+  unfollowBtn.textContent = 'Unfollow';
+  unfollowBtn.setAttribute('aria-label', `Unfollow #${item.id}`);
+  unfollowBtn.addEventListener('click', () => handleUnfollow(item));
+
+  actionsDiv.appendChild(unfollowBtn);
+
+  li.appendChild(infoDiv);
+  li.appendChild(actionsDiv);
+  return li;
+}
+
+function getPRStatusBadgeClass(status) {
+  if (status === 'active') return 'badge--active';
+  if (status === 'completed') return 'badge--resolved';
+  if (status === 'abandoned') return 'badge--default';
+  return 'badge--default';
+}
+
+function updateFollowingTabBadge(items) {
+  const hasNew = (items || []).some(i => i.type === 'pullRequest' && i.hasNewComments);
+  $tabFollowingBadge.hidden = !hasNew;
+}
+
+function showFollowError(msg) {
+  $followError.textContent = msg;
+  $followError.hidden = false;
+}
+
+function hideFollowError() {
+  $followError.textContent = '';
+  $followError.hidden = true;
 }
 
 // ---------------------------------------------------------------------------
