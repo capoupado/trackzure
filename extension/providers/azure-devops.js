@@ -170,13 +170,15 @@ export class AzureDevOpsProvider extends WorkItemProvider {
   // ---------------------------------------------------------------------------
 
   async logTime(workItemId, durationHours, comment) {
-    // Step 1: Read current CompletedWork value
-    const getUrl = `${this.config.baseUrl}/_apis/wit/workitems/${workItemId}?fields=Microsoft.VSTS.Scheduling.CompletedWork&api-version=${this.apiVersion}`;
+    // Step 1: Read current CompletedWork and RemainingWork values
+    const fields = 'Microsoft.VSTS.Scheduling.CompletedWork,Microsoft.VSTS.Scheduling.RemainingWork';
+    const getUrl = `${this.config.baseUrl}/_apis/wit/workitems/${workItemId}?fields=${encodeURIComponent(fields)}&api-version=${this.apiVersion}`;
     const current = await this._fetch(getUrl);
     const currentCompleted = current?.fields?.['Microsoft.VSTS.Scheduling.CompletedWork'] ?? 0;
+    const currentRemaining = current?.fields?.['Microsoft.VSTS.Scheduling.RemainingWork'];
     const newCompleted = Math.round((currentCompleted + durationHours) * 100) / 100;
 
-    // Step 2: PATCH CompletedWork + optional comment via System.History in one request.
+    // Step 2: PATCH CompletedWork + optional RemainingWork + optional comment via System.History.
     // System.History is supported on all TFS/AzDO versions; no separate comment endpoint needed.
     const patchUrl = `${this.config.baseUrl}/_apis/wit/workitems/${workItemId}?api-version=${this.apiVersion}`;
     const patchOps = [
@@ -186,6 +188,14 @@ export class AzureDevOpsProvider extends WorkItemProvider {
         value: newCompleted,
       },
     ];
+    if (currentRemaining != null) {
+      const newRemaining = Math.round(Math.max(0, currentRemaining - durationHours) * 100) / 100;
+      patchOps.push({
+        op: 'add',
+        path: '/fields/Microsoft.VSTS.Scheduling.RemainingWork',
+        value: newRemaining,
+      });
+    }
     if (comment) {
       patchOps.push({ op: 'add', path: '/fields/System.History', value: comment });
     }
