@@ -1,3 +1,16 @@
 # Claude Code local config
 .claude/
 CLAUDE.md
+
+# Ignore node_modules
+node_modules/
+
+# Ignore .env files
+.env
+.env.local
+
+# Ignore vs code settings
+.vscode/
+
+# Ignore mcp config
+.vs/

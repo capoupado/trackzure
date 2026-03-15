@@ -171,11 +171,12 @@ export class AzureDevOpsProvider extends WorkItemProvider {
 
   async logTime(workItemId, durationHours, comment) {
     // Step 1: Read current CompletedWork and RemainingWork values
-    const fields = 'Microsoft.VSTS.Scheduling.CompletedWork,Microsoft.VSTS.Scheduling.RemainingWork';
-    const getUrl = `${this.config.baseUrl}/_apis/wit/workitems/${workItemId}?fields=${encodeURIComponent(fields)}&api-version=${this.apiVersion}`;
+    // Fetch without field filter — some on-prem versions mishandle encoded comma in fields param
+    const getUrl = `${this.config.baseUrl}/_apis/wit/workitems/${workItemId}?api-version=${this.apiVersion}`;
     const current = await this._fetch(getUrl);
     const currentCompleted = current?.fields?.['Microsoft.VSTS.Scheduling.CompletedWork'] ?? 0;
     const currentRemaining = current?.fields?.['Microsoft.VSTS.Scheduling.RemainingWork'];
+    console.log(`[logTime] WI #${workItemId} — CompletedWork: ${currentCompleted}, RemainingWork: ${currentRemaining}`);
     const newCompleted = Math.round((currentCompleted + durationHours) * 100) / 100;
 
     // Step 2: PATCH CompletedWork + optional RemainingWork + optional comment via System.History.
