@@ -27,6 +27,7 @@ let _tickInterval = null;
 let _pendingLogWorkItemId = null;
 let _activeIterationFilter = null; // F3
 let _openStateDropdownId = null;   // F1
+const _collapsedGroups = new Set(); // tracks collapsed work item type groups
 // Timestamp of the newest mention the user has seen (persisted in storage)
 let _mentionsLastViewed = 0;
 
@@ -212,7 +213,18 @@ function render() {
 const STATE_ORDER = {
   'In Progress': 0,
   'Active': 1,
-  'New': 2,
+  'In Review': 2,
+  'New': 3,
+  'Accepted': 4,
+};
+
+const TYPE_ORDER = {
+  'Bug': 0,
+  'User Story': 1,
+  'Product Backlog Item': 1,
+  'Task': 2,
+  'Feature': 3,
+  'Epic': 4,
 };
 
 function getStateOrder(stateStr) {
@@ -225,13 +237,72 @@ function renderWorkItems(workItems, activeTimer, timeLog) {
     return diff !== 0 ? diff : a.id.localeCompare(b.id);
   });
 
+  // Group by type
+  const groups = new Map();
+  for (const item of sorted) {
+    const type = item.type || 'Other';
+    if (!groups.has(type)) groups.set(type, []);
+    groups.get(type).push(item);
+  }
+
+  // Sort groups by TYPE_ORDER
+  const sortedGroups = [...groups.entries()].sort(
+    ([a], [b]) => (TYPE_ORDER[a] ?? 99) - (TYPE_ORDER[b] ?? 99)
+  );
+
   // Clear and rebuild list
   $list.textContent = '';
 
-  for (const item of sorted) {
-    const li = buildWorkItemRow(item, activeTimer, timeLog);
-    $list.appendChild(li);
+  for (const [type, items] of sortedGroups) {
+    const header = buildGroupHeader(type, items.length);
+    $list.appendChild(header);
+
+    const isCollapsed = _collapsedGroups.has(type);
+    for (const item of items) {
+      const li = buildWorkItemRow(item, activeTimer, timeLog);
+      li.dataset.groupType = type;
+      if (isCollapsed) li.classList.add('hidden-by-group');
+      $list.appendChild(li);
+    }
   }
+}
+
+function buildGroupHeader(type, count) {
+  const li = document.createElement('li');
+  li.className = `work-item-group-header${_collapsedGroups.has(type) ? ' collapsed' : ''}`;
+  li.dataset.groupType = type;
+
+  const chevron = document.createElement('span');
+  chevron.className = 'chevron';
+  chevron.textContent = '▾';
+
+  const label = document.createElement('span');
+  label.textContent = type;
+
+  const countBadge = document.createElement('span');
+  countBadge.className = 'group-count';
+  countBadge.textContent = `(${count})`;
+
+  li.appendChild(chevron);
+  li.appendChild(label);
+  li.appendChild(countBadge);
+
+  li.addEventListener('click', () => {
+    const isNowCollapsed = _collapsedGroups.has(type);
+    if (isNowCollapsed) {
+      _collapsedGroups.delete(type);
+      li.classList.remove('collapsed');
+    } else {
+      _collapsedGroups.add(type);
+      li.classList.add('collapsed');
+    }
+    // Toggle visibility of items in this group
+    $list.querySelectorAll(`.work-item[data-group-type="${CSS.escape(type)}"]`).forEach(el => {
+      el.classList.toggle('hidden-by-group', !isNowCollapsed);
+    });
+  });
+
+  return li;
 }
 
 function buildWorkItemRow(item, activeTimer, timeLog) {
@@ -362,7 +433,9 @@ function getStateBadgeClass(stateStr) {
   const s = (stateStr || '').toLowerCase().replace(/\s+/g, '-');
   if (s === 'in-progress') return 'badge--in-progress';
   if (s === 'active') return 'badge--active';
+  if (s === 'in-review') return 'badge--in-review';
   if (s === 'new') return 'badge--new';
+  if (s === 'accepted') return 'badge--accepted';
   if (s === 'resolved' || s === 'done' || s === 'closed') return 'badge--resolved';
   return 'badge--default';
 }
