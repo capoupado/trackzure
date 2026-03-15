@@ -128,6 +128,167 @@ body {
 }
 
 /* -------------------------------------------------------------------------
+   Search bar
+------------------------------------------------------------------------- */
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: rgba(255,255,255,0.02);
+  flex-shrink: 0;
+}
+
+.search-icon {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  padding: 4px 0;
+}
+
+.search-input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+.search-clear {
+  padding: 2px;
+}
+
+/* -------------------------------------------------------------------------
+   History panel
+------------------------------------------------------------------------- */
+
+.history-summary {
+  padding: 10px 14px 4px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.history-summary strong {
+  color: var(--color-text);
+}
+
+.history-day-header {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-muted);
+  padding: 10px 14px 2px;
+  opacity: 0.7;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+}
+
+.history-day-total {
+  font-weight: 400;
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+
+.history-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  list-style: none;
+}
+
+.history-entry--undone {
+  opacity: 0.45;
+}
+
+.history-entry--undone .history-entry-title,
+.history-entry--undone .history-entry-hours {
+  text-decoration: line-through;
+}
+
+.history-entry-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-entry-title {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-entry-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.history-entry-hours {
+  font-family: 'Consolas', 'Courier New', monospace;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.history-entry-comment {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-undo {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: var(--radius);
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-undo:hover {
+  background: rgba(232,85,85,0.12);
+  color: var(--color-error);
+  border-color: rgba(232,85,85,0.4);
+}
+
+.btn-undo:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.history-undone-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  padding: 3px 0;
+  flex-shrink: 0;
+}
+
+/* -------------------------------------------------------------------------
    Tab navigation
 ------------------------------------------------------------------------- */
 

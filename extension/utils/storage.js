@@ -227,6 +227,35 @@ export async function updateFollowedItem(id, updater) {
 }
 
 // ---------------------------------------------------------------------------
+// Time log history
+// ---------------------------------------------------------------------------
+
+export async function getTimeLogHistory() {
+  const { timeLogHistory } = await getLocal('timeLogHistory');
+  return timeLogHistory || [];
+}
+
+export async function saveTimeLogHistory(history) {
+  await setLocal({ timeLogHistory: history });
+}
+
+export async function appendTimeLogEntry(entry) {
+  const history = await getTimeLogHistory();
+  history.push(entry);
+  await saveTimeLogHistory(history);
+}
+
+export async function pruneTimeLogHistory(maxAgeDays = 7) {
+  const history = await getTimeLogHistory();
+  const cutoff = Date.now() - (maxAgeDays * 86_400_000);
+  const pruned = history.filter(e => e.timestamp >= cutoff);
+  if (pruned.length !== history.length) {
+    await saveTimeLogHistory(pruned);
+  }
+  return pruned;
+}
+
+// ---------------------------------------------------------------------------
 // Mentions
 // ---------------------------------------------------------------------------
 

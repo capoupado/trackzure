@@ -6,7 +6,7 @@
  * variables surviving across alarm ticks.
  */
 
-import { createProvider, fetchWorkItems, submitTimeLog, fetchPullRequests, fetchMentions, resolveFollowedItem, refreshFollowedItems } from './utils/api.js';
+import { createProvider, fetchWorkItems, submitTimeLog, fetchPullRequests, fetchMentions, resolveFollowedItem, refreshFollowedItems, searchWorkItems, undoTimeLog } from './utils/api.js';
 import {
   getSettings,
   getActiveTimer,
@@ -28,6 +28,10 @@ import {
   getToken,
   getSession,
   setSession,
+  getTimeLogHistory,
+  saveTimeLogHistory,
+  appendTimeLogEntry,
+  pruneTimeLogHistory,
 } from './utils/storage.js';
 import { getElapsedMs, stopTimer, startTimer, formatElapsedForBadge } from './utils/timer.js';
 
@@ -441,6 +445,56 @@ async function handleLogTime({ workItemId, durationHours, comment }) {
       await clearActiveTimer();
       clearBadge();
     }
+
+    // Record in history
+    const { workItems } = await getWorkItems();
+    const wi = (workItems || []).find(w => w.id === workItemId);
+    await appendTimeLogEntry({
+      id: crypto.randomUUID(),
+      workItemId,
+      workItemTitle: wi?.title || `#${workItemId}`,
+      hours: durationHours,
+      comment: comment || null,
+      timestamp: Date.now(),
+      undone: false,
+    });
+  }
+
+  return result;
+}
+
+async function handleSearchItems({ query }) {
+  const provider = await initProvider();
+  if (!provider) return { success: false, error: 'Provider not configured. Please check Settings.' };
+
+  try {
+    const items = await searchWorkItems(provider, query, 20);
+    return { success: true, items };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+async function handleGetTimeLogHistory() {
+  const history = await pruneTimeLogHistory(7);
+  return { success: true, history };
+}
+
+async function handleUndoTimeLog({ entryId }) {
+  const provider = await initProvider();
+  if (!provider) return { success: false, error: 'Provider not configured. Please check Settings.' };
+
+  const history = await getTimeLogHistory();
+  const entry = history.find(e => e.id === entryId);
+  if (!entry) return { success: false, error: 'History entry not found.' };
+  if (entry.undone) return { success: false, error: 'Already undone.' };
+
+  const undoComment = `Undo: -${entry.hours}h (via Trackzure)`;
+  const result = await undoTimeLog(provider, entry.workItemId, entry.hours, undoComment);
+
+  if (result.success) {
+    const updatedHistory = history.map(e => e.id === entryId ? { ...e, undone: true } : e);
+    await saveTimeLogHistory(updatedHistory);
   }
 
   return result;
@@ -647,6 +701,12 @@ async function handleMessage(message) {
       return handleUnfollowItem(message);
     case 'MARK_FOLLOWED_SEEN':
       return handleMarkFollowedSeen();
+    case 'SEARCH_ITEMS':
+      return handleSearchItems(message);
+    case 'GET_TIME_LOG_HISTORY':
+      return handleGetTimeLogHistory();
+    case 'UNDO_TIME_LOG':
+      return handleUndoTimeLog(message);
     default:
       return { success: false, error: `Unknown message type: ${message.type}` };
   }

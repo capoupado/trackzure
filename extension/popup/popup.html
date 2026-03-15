@@ -33,6 +33,22 @@
     </button>
   </header>
 
+  <!-- Search bar -->
+  <div class="search-bar">
+    <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+      <line x1="10" y1="10" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+    </svg>
+    <input type="text" id="search-input" class="search-input"
+           placeholder="Search by ID or title..." autocomplete="off" spellcheck="false" />
+    <button class="btn-icon search-clear" id="search-clear" hidden aria-label="Clear search">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <line x1="3" y1="3" x2="13" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="13" y1="3" x2="3" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+
   <!-- Tab navigation -->
   <nav class="tab-nav" role="tablist" aria-label="Main navigation">
     <button class="tab-btn tab-btn--active" id="tab-work-items" role="tab"
@@ -72,6 +88,14 @@
         <path d="M11 5v3h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <span class="tab-new-badge" id="tab-mentions-badge" hidden aria-hidden="true"></span>
+    </button>
+    <button class="tab-btn" id="tab-history" role="tab"
+            aria-selected="false" aria-controls="panel-history" data-tab="history"
+            title="Time Log History">
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2" fill="none"/>
+        <polyline points="8,4.5 8,8 10.5,10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
     </button>
   </nav>
 
@@ -189,6 +213,37 @@
       <div id="mentions-setup-state" class="state-panel" hidden>
         <span class="state-icon" aria-hidden="true">🔧</span>
         <p>Configure your server connection to see mentions.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Search results panel -->
+  <div id="panel-search-results" class="tab-panel" hidden role="region" aria-label="Search results">
+    <main>
+      <div id="search-loading" class="state-panel" hidden>
+        <p class="state-icon" aria-hidden="true">⏳</p>
+        <p>Searching…</p>
+      </div>
+      <ul id="search-result-list" aria-label="Search results"></ul>
+      <div id="search-empty" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">🔍</span>
+        <p>No work items found.</p>
+      </div>
+      <div id="search-error" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">⚠️</span>
+        <p id="search-error-msg">Search failed.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- History panel -->
+  <div id="panel-history" class="tab-panel" hidden role="tabpanel">
+    <main>
+      <div id="history-summary" class="history-summary"></div>
+      <ul id="history-list" aria-label="Time log history"></ul>
+      <div id="history-empty-state" class="state-panel" hidden>
+        <span class="state-icon" aria-hidden="true">📋</span>
+        <p>No time logged yet. Start a timer and log time to see your history here.</p>
       </div>
     </main>
   </div>

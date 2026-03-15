@@ -164,6 +164,33 @@ export async function refreshFollowedItems(provider, currentItems) {
 }
 
 /**
+ * Search work items by ID or title keyword.
+ * @param {WorkItemProvider} provider
+ * @param {string} query
+ * @param {number} [maxResults=20]
+ * @returns {Promise<Array>}
+ */
+export async function searchWorkItems(provider, query, maxResults = 20) {
+  return provider.searchWorkItems(query, maxResults);
+}
+
+/**
+ * Undo a time log entry by subtracting hours from CompletedWork.
+ * @param {WorkItemProvider} provider
+ * @param {string} workItemId
+ * @param {number} hours
+ * @param {string} [comment]
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+export async function undoTimeLog(provider, workItemId, hours, comment) {
+  try {
+    return await provider.undoTimeLog(workItemId, hours, comment);
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Test a connection without persisting anything.
  * @param {string} type
  * @param {object} config

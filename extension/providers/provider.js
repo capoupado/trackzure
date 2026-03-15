@@ -119,4 +119,25 @@ export class WorkItemProvider {
   async getMentions() {
     return [];
   }
+
+  /**
+   * Search work items by ID (exact) or title keyword (CONTAINS). No assignee or state filter.
+   * @param {string} query — numeric string for ID search, otherwise title substring
+   * @param {number} [maxResults=20]
+   * @returns {Promise<Array<{ id: string, title: string, state: string, type: string, url: string }>>}
+   */
+  async searchWorkItems(query, maxResults = 20) {
+    throw new Error('WorkItemProvider.searchWorkItems() must be implemented');
+  }
+
+  /**
+   * Undo a time log entry — subtract hours from CompletedWork (floored at 0).
+   * @param {string} workItemId
+   * @param {number} hours
+   * @param {string} [comment]
+   * @returns {Promise<{ success: boolean, message?: string }>}
+   */
+  async undoTimeLog(workItemId, hours, comment) {
+    throw new Error('WorkItemProvider.undoTimeLog() must be implemented');
+  }
 }

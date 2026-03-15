@@ -642,6 +642,96 @@ export class AzureDevOpsProvider extends WorkItemProvider {
   }
 
   // ---------------------------------------------------------------------------
+  // searchWorkItems
+  // ---------------------------------------------------------------------------
+
+  async searchWorkItems(query, maxResults = 20) {
+    const q = String(query).trim();
+    if (!q) return [];
+
+    // Numeric query → exact ID match; otherwise title CONTAINS
+    let wiqlQuery;
+    if (/^\d+$/.test(q)) {
+      wiqlQuery = `SELECT [System.Id] FROM WorkItems WHERE [System.Id] = ${q}`;
+    } else {
+      const escaped = q.replace(/'/g, "''");
+      wiqlQuery = `SELECT [System.Id] FROM WorkItems WHERE [System.Title] CONTAINS '${escaped}' ORDER BY [System.ChangedDate] DESC`;
+    }
+
+    const project = this.config.project;
+    const wiqlBody = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: wiqlQuery }),
+    };
+
+    let wiqlResult;
+    if (project) {
+      const projectUrl = `${this.config.baseUrl}/${encodeURIComponent(project)}/_apis/wit/wiql?api-version=${this.apiVersion}`;
+      try {
+        wiqlResult = await this._fetch(projectUrl, wiqlBody);
+      } catch (err) {
+        if (err.httpStatus !== 404) throw err;
+        const collectionUrl = `${this.config.baseUrl}/_apis/wit/wiql?api-version=${this.apiVersion}`;
+        wiqlResult = await this._fetch(collectionUrl, wiqlBody);
+      }
+    } else {
+      const collectionUrl = `${this.config.baseUrl}/_apis/wit/wiql?api-version=${this.apiVersion}`;
+      wiqlResult = await this._fetch(collectionUrl, wiqlBody);
+    }
+
+    const ids = (wiqlResult?.workItems || []).map(wi => wi.id).slice(0, maxResults);
+    if (ids.length === 0) return [];
+
+    const fields = ['System.Id', 'System.Title', 'System.State', 'System.WorkItemType', 'System.TeamProject'].join(',');
+    const detailUrl = `${this.config.baseUrl}/_apis/wit/workitems?ids=${ids.join(',')}&fields=${encodeURIComponent(fields)}&api-version=${this.apiVersion}`;
+    const detailResult = await this._fetch(detailUrl);
+
+    return (detailResult?.value || []).map(wi => ({
+      id: String(wi.id),
+      title: wi.fields['System.Title'] || '(no title)',
+      state: wi.fields['System.State'] || '',
+      type: wi.fields['System.WorkItemType'] || '',
+      url: this._buildWorkItemUrl(wi.id, wi.fields['System.TeamProject']),
+    }));
+  }
+
+  // ---------------------------------------------------------------------------
+  // undoTimeLog
+  // ---------------------------------------------------------------------------
+
+  async undoTimeLog(workItemId, hours, comment) {
+    const getUrl = `${this.config.baseUrl}/_apis/wit/workitems/${workItemId}?api-version=${this.apiVersion}`;
+    const current = await this._fetch(getUrl);
+    const currentCompleted = current?.fields?.['Microsoft.VSTS.Scheduling.CompletedWork'] ?? 0;
+    const currentRemaining = current?.fields?.['Microsoft.VSTS.Scheduling.RemainingWork'];
+
+    const newCompleted = Math.round(Math.max(0, currentCompleted - hours) * 100) / 100;
+
+    const patchOps = [
+      { op: 'add', path: '/fields/Microsoft.VSTS.Scheduling.CompletedWork', value: newCompleted },
+    ];
+
+    if (currentRemaining != null) {
+      const newRemaining = Math.round((currentRemaining + hours) * 100) / 100;
+      patchOps.push({ op: 'add', path: '/fields/Microsoft.VSTS.Scheduling.RemainingWork', value: newRemaining });
+    }
+
+    if (comment) {
+      patchOps.push({ op: 'add', path: '/fields/System.History', value: comment });
+    }
+
+    const patchUrl = `${this.config.baseUrl}/_apis/wit/workitems/${workItemId}?api-version=${this.apiVersion}`;
+    await this._fetch(patchUrl, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json-patch+json' },
+      body: JSON.stringify(patchOps),
+    });
+
+    return { success: true };
+  }
+
+  // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
 

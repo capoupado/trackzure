@@ -31,6 +31,10 @@ const _collapsedGroups = new Set(); // tracks collapsed work item type groups
 // Timestamp of the newest mention the user has seen (persisted in storage)
 let _mentionsLastViewed = 0;
 
+// Search
+let _searchActive = false;
+let _searchDebounceTimer = null;
+
 // ---------------------------------------------------------------------------
 // DOM refs
 // ---------------------------------------------------------------------------
@@ -79,6 +83,20 @@ const $mentionsErrorState = document.getElementById('mentions-error-state');
 const $mentionsSetupState = document.getElementById('mentions-setup-state');
 const $tabMentionsBadge = document.getElementById('tab-mentions-badge');
 
+// Search refs
+const $searchInput = document.getElementById('search-input');
+const $searchClear = document.getElementById('search-clear');
+const $searchResultList = document.getElementById('search-result-list');
+const $searchResultsPanel = document.getElementById('panel-search-results');
+const $searchLoading = document.getElementById('search-loading');
+const $searchEmpty = document.getElementById('search-empty');
+const $searchError = document.getElementById('search-error');
+
+// History refs
+const $historyList = document.getElementById('history-list');
+const $historyEmptyState = document.getElementById('history-empty-state');
+const $historySummary = document.getElementById('history-summary');
+
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
@@ -102,6 +120,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   $btnFollowAdd.addEventListener('click', handleFollowAdd);
   $followInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleFollowAdd(); });
   $btnFollowCurrent.addEventListener('click', handleFollowCurrentPage);
+
+  // Search
+  $searchInput.addEventListener('input', onSearchInput);
+  $searchClear.addEventListener('click', clearSearch);
+  $searchInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') clearSearch(); });
 
   // F3 — Filter panel
   $filterBtn.addEventListener('click', (e) => {
@@ -817,6 +840,12 @@ function initTabs() {
 }
 
 function switchTab(tabId) {
+  // Exit search mode when user navigates tabs
+  if (_searchActive) {
+    _searchActive = false;
+    $searchResultsPanel.hidden = true;
+  }
+
   document.querySelectorAll('.tab-btn').forEach(b => {
     const active = b.dataset.tab === tabId;
     b.classList.toggle('tab-btn--active', active);
@@ -829,6 +858,8 @@ function switchTab(tabId) {
     handleFollowingTabOpened();
   } else if (tabId === 'mentions') {
     handleMentionsTabOpened();
+  } else if (tabId === 'history') {
+    handleHistoryTabOpened();
   }
 }
 
@@ -1369,6 +1400,280 @@ function showFollowError(msg) {
 function hideFollowError() {
   $followError.textContent = '';
   $followError.hidden = true;
+}
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+function onSearchInput() {
+  const query = $searchInput.value.trim();
+  $searchClear.hidden = query.length === 0;
+
+  clearTimeout(_searchDebounceTimer);
+
+  if (query.length === 0) {
+    exitSearchMode();
+    return;
+  }
+
+  const delay = /^\d+$/.test(query) ? 150 : 400;
+  _searchDebounceTimer = setTimeout(() => performSearch(query), delay);
+}
+
+function enterSearchMode() {
+  if (_searchActive) return;
+  _searchActive = true;
+  document.querySelectorAll('.tab-panel').forEach(p => { p.hidden = true; });
+  $searchResultsPanel.hidden = false;
+}
+
+function exitSearchMode() {
+  _searchActive = false;
+  $searchResultsPanel.hidden = true;
+  // Restore active tab's panel
+  const activeBtn = document.querySelector('.tab-btn--active');
+  if (activeBtn) {
+    const panelId = `panel-${activeBtn.dataset.tab}`;
+    const panel = document.getElementById(panelId);
+    if (panel) panel.hidden = false;
+  }
+  $searchResultList.textContent = '';
+  $searchEmpty.hidden = true;
+  $searchError.hidden = true;
+  $searchLoading.hidden = true;
+}
+
+function clearSearch() {
+  $searchInput.value = '';
+  $searchClear.hidden = true;
+  clearTimeout(_searchDebounceTimer);
+  exitSearchMode();
+  $searchInput.focus();
+}
+
+async function performSearch(query) {
+  enterSearchMode();
+  $searchLoading.hidden = false;
+  $searchResultList.textContent = '';
+  $searchEmpty.hidden = true;
+  $searchError.hidden = true;
+
+  try {
+    const result = await chrome.runtime.sendMessage({ type: 'SEARCH_ITEMS', query });
+    $searchLoading.hidden = true;
+
+    if (!result?.success) {
+      document.getElementById('search-error-msg').textContent = result?.error || 'Search failed.';
+      $searchError.hidden = false;
+      return;
+    }
+
+    if (result.items.length === 0) {
+      $searchEmpty.hidden = false;
+      return;
+    }
+
+    renderSearchResults(result.items);
+  } catch (err) {
+    $searchLoading.hidden = true;
+    document.getElementById('search-error-msg').textContent = err.message;
+    $searchError.hidden = false;
+  }
+}
+
+function renderSearchResults(items) {
+  $searchResultList.textContent = '';
+  for (const item of items) {
+    $searchResultList.appendChild(buildSearchResultRow(item));
+  }
+}
+
+function buildSearchResultRow(item) {
+  const li = buildWorkItemRow(item, state.activeTimer, state.timeLog);
+
+  // Add Follow button to the actions div
+  const actionsDiv = li.querySelector('.work-item-actions');
+  const followBtn = document.createElement('button');
+  followBtn.className = 'btn-open';
+  followBtn.textContent = 'Follow';
+  followBtn.setAttribute('aria-label', `Follow #${item.id}`);
+  followBtn.addEventListener('click', async () => {
+    followBtn.disabled = true;
+    try {
+      const result = await chrome.runtime.sendMessage({ type: 'FOLLOW_ITEM', rawId: `#${item.id}` });
+      if (result?.success) {
+        showToast(`Now following #${item.id}`);
+        followBtn.textContent = 'Following';
+      } else {
+        showToast(result?.error || 'Failed to follow', 'error');
+        followBtn.disabled = false;
+      }
+    } catch (err) {
+      showToast(`Error: ${err.message}`, 'error');
+      followBtn.disabled = false;
+    }
+  });
+  actionsDiv.appendChild(followBtn);
+
+  return li;
+}
+
+// ---------------------------------------------------------------------------
+// History tab
+// ---------------------------------------------------------------------------
+
+async function handleHistoryTabOpened() {
+  try {
+    const result = await chrome.runtime.sendMessage({ type: 'GET_TIME_LOG_HISTORY' });
+    if (result?.success) {
+      renderHistory(result.history);
+    }
+  } catch (err) {
+    console.error('[popup] Failed to load history:', err);
+  }
+}
+
+function renderHistory(history) {
+  $historyList.textContent = '';
+  $historyEmptyState.hidden = true;
+  $historySummary.textContent = '';
+
+  if (!history || history.length === 0) {
+    $historyEmptyState.hidden = false;
+    return;
+  }
+
+  // Sort newest first
+  const sorted = [...history].sort((a, b) => b.timestamp - a.timestamp);
+
+  // Group by day
+  const groups = new Map();
+  for (const entry of sorted) {
+    const dayKey = new Date(entry.timestamp).toLocaleDateString(undefined, {
+      weekday: 'short', month: 'short', day: 'numeric',
+    });
+    if (!groups.has(dayKey)) groups.set(dayKey, []);
+    groups.get(dayKey).push(entry);
+  }
+
+  // Today summary
+  const todayKey = new Date().toLocaleDateString(undefined, {
+    weekday: 'short', month: 'short', day: 'numeric',
+  });
+  const todayEntries = groups.get(todayKey) || [];
+  const todayTotal = todayEntries.filter(e => !e.undone).reduce((s, e) => s + e.hours, 0);
+  if (todayTotal > 0) {
+    const span = document.createElement('span');
+    span.textContent = 'Today: ';
+    const strong = document.createElement('strong');
+    strong.textContent = `${Math.round(todayTotal * 100) / 100}h logged`;
+    $historySummary.appendChild(span);
+    $historySummary.appendChild(strong);
+  }
+
+  for (const [day, entries] of groups) {
+    const dayTotal = entries.filter(e => !e.undone).reduce((s, e) => s + e.hours, 0);
+
+    const header = document.createElement('li');
+    header.className = 'history-day-header';
+    const dayLabel = document.createElement('span');
+    dayLabel.textContent = day;
+    const dayTotalSpan = document.createElement('span');
+    dayTotalSpan.className = 'history-day-total';
+    dayTotalSpan.textContent = `${Math.round(dayTotal * 100) / 100}h`;
+    header.appendChild(dayLabel);
+    header.appendChild(dayTotalSpan);
+    $historyList.appendChild(header);
+
+    for (const entry of entries) {
+      $historyList.appendChild(buildHistoryEntry(entry));
+    }
+  }
+}
+
+function buildHistoryEntry(entry) {
+  const li = document.createElement('li');
+  li.className = `history-entry${entry.undone ? ' history-entry--undone' : ''}`;
+
+  const info = document.createElement('div');
+  info.className = 'history-entry-info';
+
+  const titleEl = document.createElement('div');
+  titleEl.className = 'history-entry-title';
+  titleEl.textContent = `#${entry.workItemId} — ${entry.workItemTitle}`;
+  titleEl.title = titleEl.textContent;
+
+  const meta = document.createElement('div');
+  meta.className = 'history-entry-meta';
+
+  const hours = document.createElement('span');
+  hours.className = 'history-entry-hours';
+  hours.textContent = `${entry.hours}h`;
+
+  const time = document.createElement('span');
+  time.textContent = new Date(entry.timestamp).toLocaleTimeString(undefined, {
+    hour: '2-digit', minute: '2-digit',
+  });
+
+  meta.appendChild(hours);
+  meta.appendChild(time);
+  info.appendChild(titleEl);
+  info.appendChild(meta);
+
+  if (entry.comment) {
+    const comment = document.createElement('div');
+    comment.className = 'history-entry-comment';
+    comment.textContent = entry.comment;
+    comment.title = entry.comment;
+    info.appendChild(comment);
+  }
+
+  li.appendChild(info);
+
+  if (!entry.undone) {
+    const undoBtn = document.createElement('button');
+    undoBtn.className = 'btn-undo';
+    undoBtn.textContent = 'Undo';
+    undoBtn.addEventListener('click', () => handleUndo(entry, undoBtn, li));
+    li.appendChild(undoBtn);
+  } else {
+    const label = document.createElement('span');
+    label.className = 'history-undone-label';
+    label.textContent = 'Undone';
+    li.appendChild(label);
+  }
+
+  return li;
+}
+
+async function handleUndo(entry, btn, li) {
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  try {
+    const result = await chrome.runtime.sendMessage({ type: 'UNDO_TIME_LOG', entryId: entry.id });
+
+    if (result?.success) {
+      li.classList.add('history-entry--undone');
+      btn.remove();
+      const label = document.createElement('span');
+      label.className = 'history-undone-label';
+      label.textContent = 'Undone';
+      li.appendChild(label);
+      showToast(`Undone: ${entry.hours}h for #${entry.workItemId}`);
+      // Refresh to update day totals
+      handleHistoryTabOpened();
+    } else {
+      showToast(result?.error || 'Undo failed', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Undo';
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Undo';
+  }
 }
 
 // ---------------------------------------------------------------------------
