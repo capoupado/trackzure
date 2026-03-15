@@ -1,0 +1,17 @@
+{
+  "name": "trakzure-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Azure DevOps PR review — diffs, comments, and more",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "diff": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

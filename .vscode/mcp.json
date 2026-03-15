@@ -1,0 +1,32 @@
+{
+  "servers": {
+    "trakzure": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["mcp-server/src/index.js"],
+      "env": {
+        "AZURE_DEVOPS_URL": "${input:azureDevOpsUrl}",
+        "AZURE_DEVOPS_PROJECT": "${input:azureDevOpsProject}",
+        "AZURE_DEVOPS_PAT": "${input:azureDevOpsPat}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "id": "azureDevOpsUrl",
+      "type": "promptString",
+      "description": "Azure DevOps base URL (e.g. https://tfs.company.com/DefaultCollection)"
+    },
+    {
+      "id": "azureDevOpsProject",
+      "type": "promptString",
+      "description": "Azure DevOps project name"
+    },
+    {
+      "id": "azureDevOpsPat",
+      "type": "promptString",
+      "description": "Azure DevOps Personal Access Token",
+      "password": true
+    }
+  ]
+}
