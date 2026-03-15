@@ -647,6 +647,51 @@ function sendNotification(id, title, message) {
   }
 }
 
+async function resolveNotificationUrl(notificationId) {
+  if (notificationId.startsWith('trackzure-added-') || notificationId.startsWith('trackzure-state-')) {
+    const itemId = notificationId.replace(/^trackzure-(added|state)-/, '');
+    const { workItems } = await getWorkItems();
+    const item = (workItems || []).find(wi => String(wi.id) === itemId);
+    return item?.url ?? null;
+  }
+
+  if (notificationId.startsWith('trackzure-removed-')) {
+    const itemId = notificationId.replace('trackzure-removed-', '');
+    const config = await getProviderConfig();
+    if (!config?.baseUrl) return null;
+    const project = config.project ? `/${encodeURIComponent(config.project)}` : '';
+    return `${config.baseUrl}${project}/_workitems/edit/${itemId}`;
+  }
+
+  if (notificationId.startsWith('pr-review-') || notificationId.startsWith('pr-completed-') || notificationId.startsWith('pr-comment-')) {
+    const itemId = notificationId.replace(/^pr-(review|completed|comment)-/, '');
+    const prs = await getPullRequests();
+    const all = [...(prs.own || []), ...(prs.reviewing || [])];
+    const pr = all.find(p => String(p.id) === itemId);
+    return pr?.url ?? null;
+  }
+
+  if (notificationId.startsWith('mention-')) {
+    const itemId = notificationId.replace('mention-', '');
+    const { mentions } = await getMentions();
+    const mention = (mentions || []).find(m => String(m.id) === itemId);
+    return mention?.url ?? null;
+  }
+
+  if (notificationId.startsWith('followed-comment-')) {
+    // Pattern: followed-comment-{type}-{id}
+    const rest = notificationId.replace('followed-comment-', '');
+    const match = rest.match(/^(workItem|pullRequest)-(.+)$/);
+    if (!match) return null;
+    const itemId = match[2];
+    const followedItems = await getFollowedItems();
+    const item = (followedItems || []).find(fi => String(fi.id) === itemId);
+    return item?.url ?? null;
+  }
+
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Event listeners
 // ---------------------------------------------------------------------------
@@ -666,6 +711,12 @@ chrome.alarms.onAlarm.addListener(async alarm => {
     await Promise.all([doRefreshWorkItems(), doRefreshPRs(), doRefreshFollowedItems(), doRefreshMentions()]);
   }
   if (alarm.name === TIMER_ALARM) await doTimerTick();
+});
+
+chrome.notifications.onClicked.addListener(async (notificationId) => {
+  chrome.notifications.clear(notificationId);
+  const url = await resolveNotificationUrl(notificationId);
+  if (url) chrome.tabs.create({ url });
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
