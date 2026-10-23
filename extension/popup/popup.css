@@ -576,6 +576,12 @@ main::-webkit-scrollbar-thumb:hover {
   border: 1px solid rgba(46,168,74,0.35);
 }
 
+.badge--rejected {
+  color: #ff6b6b;
+  background: rgba(232,85,85,0.18);
+  border: 1px solid rgba(232,85,85,0.4);
+}
+
 .badge--default {
   color: #9b9baf;
   background: rgba(121,121,149,0.15);

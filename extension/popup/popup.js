@@ -459,6 +459,7 @@ function getStateBadgeClass(stateStr) {
   if (s === 'in-review') return 'badge--in-review';
   if (s === 'new') return 'badge--new';
   if (s === 'accepted') return 'badge--accepted';
+  if (s === 'rejected') return 'badge--rejected';
   if (s === 'resolved' || s === 'done' || s === 'closed') return 'badge--resolved';
   return 'badge--default';
 }
